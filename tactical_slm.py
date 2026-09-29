@@ -144,7 +144,7 @@ def run_demo(gater):
 def main():
     gater = TacticalAlertGater()
 
-    # Warmup: goi 1 lan de tai mo hinh len GPU (lan dau co the 10-30s),
+    # Warmup: goi 1 lan de tai mo hinh len GPU (lan dau co the 10-30s)
     # cac lan goi sau moi < 0.2s
     try:
         call_ollama("Tra ve dung 1 tu: An toan", timeout=90)
