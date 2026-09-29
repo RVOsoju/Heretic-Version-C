@@ -91,26 +91,33 @@ def call_ollama(prompt, timeout=10.0):
     return response.json()["response"].strip(), latency_ms
 
 
-def process_payload(payload, gater):
-    """Xuly mot payload JSON: kiem ngat ngan -> goi SLM -> in cau canh bao."""
+def evaluate_alert(payload, gater):
+    """Kiem ngat ngan + goi SLM. Tra ve cau canh bao (str) hoac None neu im lang."""
     threats = [
         t for t in payload.get("detected_threats", [])
         if t.get("target") in DANGEROUS_TARGETS
     ]
     alerting = [t for t in threats if gater.should_alert(t)]
     if not alerting:
-        return
+        return None
     # Ghi nhan khoang cach da bao (lay target gan nhat de SLM chon)
     closest = min(alerting, key=lambda t: float(t.get("distance_m", 1e9)))
     gater.last_warned[gater._key(closest)] = float(closest["distance_m"])
 
     prompt = SYSTEM_PROMPT + "\n\nDu lieu cam bien:\n" + json.dumps(payload, ensure_ascii=False)
     try:
-        alert, latency_ms = call_ollama(prompt)
+        alert, _ = call_ollama(prompt)
+        return alert
     except Exception as exc:
         print(f"[LOI] Khong the goi Ollama: {exc}", flush=True)
-        return
-    print(f"[{latency_ms:.0f}ms] {alert}", flush=True)
+        return None
+
+
+def process_payload(payload, gater):
+    """Xuly mot payload JSON: kiem ngat ngan -> goi SLM -> in cau canh bao."""
+    alert = evaluate_alert(payload, gater)
+    if alert:
+        print(alert, flush=True)
 
 
 def iter_json_objects(text):
