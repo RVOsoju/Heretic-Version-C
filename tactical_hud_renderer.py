@@ -52,9 +52,10 @@ def draw_soldier_marker(frame, cx, cy):
     _text(frame, "SOLDIER", (cx + 14, cy + 5), BLUE, 0.5, 1)
 
 
-def draw_minimap(frame, uav_frac, units):
+def draw_minimap(frame, uav_frac, units, gps_units=()):
     """Minimap goc phai tren. uav_frac: toa do (fx, fy) trong [0,1].
-    units: list (distance_m, bearing, side) - 'enemy' dot do, 'friendly' dot xanh."""
+    units: list (distance_m, bearing, side) tu box YOLO - 'enemy' dot do, 'friendly' dot xanh.
+    gps_units: list (dx_m, dy_m, side) - don doi co vi tri GPS thuc, ve theo toa do relative."""
     s = MINIMAP_SIZE
     ox, oy = frame.shape[1] - s - 12, 12
 
@@ -80,7 +81,17 @@ def draw_minimap(frame, uav_frac, units):
         cv2.circle(frame, (ex, ey), 5, color, -1, cv2.LINE_AA)
         cv2.circle(frame, (ex, ey), 8, color, 1, cv2.LINE_AA)
 
-    # UAV (xanh la): vi tri giong (simulated)
+    # Don doi (xanh): vi tri GPS thuc quy ve quanh lich (dy > 0 = Bac = len len)
+    for dx, dy, side in gps_units:
+        ex = int(cx + dx * px_per_m)
+        ey = int(cy - dy * px_per_m)
+        ex = max(ox + 4, min(ox + s - 4, ex))
+        ey = max(oy + 4, min(oy + s - 4, ey))
+        color = BLUE if side == "friendly" else RED
+        cv2.circle(frame, (ex, ey), 5, color, -1, cv2.LINE_AA)
+        cv2.circle(frame, (ex, ey), 8, color, 1, cv2.LINE_AA)
+
+    # UAV (xanh la): vi tri tu feed hoac mo phong
     ux = ox + int(uav_frac[0] * s)
     uy = oy + int(uav_frac[1] * s)
     cv2.circle(frame, (ux, uy), 5, GREEN, -1, cv2.LINE_AA)
@@ -115,9 +126,10 @@ def draw_alert_bar(frame, text, blink_on):
         _text(frame, body, ((w - tw) // 2, y0 + bar_h // 2 + th // 2), fg, 0.8, 2)
 
 
-def render_hud(frame, tactical_data, alert_text, now):
+def render_hud(frame, tactical_data, alert_text, now, uav_frac=(0.15, 0.18), gps_units=()):
     """Gop toan bo HUD len khung hinh. tactical_data: list {target, distance_m,
-    bearing}. alert_text: cau SLM hoac None. now: thoi diem (s) cho nhap chop."""
+    bearing}. alert_text: cau SLM hoac None. now: thoi diem (s) cho nhap chop.
+    uav_frac: vi tri UAV tren minimap (tu feed GPS). gps_units: don doi theo GPS thuc."""
     h, w = frame.shape[:2]
 
     draw_soldier_marker(frame, w // 2, h // 2)
@@ -130,9 +142,10 @@ def render_hud(frame, tactical_data, alert_text, now):
         label = f"{name} {t['distance_m']}m {t['bearing'].upper()}"
         draw_military_bbox(frame, x1, y1, x2, y2, color, label)
 
-    draw_minimap(frame, uav_frac=(0.15, 0.18),
+    draw_minimap(frame, uav_frac=uav_frac,
                  units=[(t["distance_m"], t["bearing"], t.get("side", "enemy"))
-                        for t in tactical_data])
+                        for t in tactical_data],
+                 gps_units=gps_units)
 
     blink_on = int(now * 2) % 2 == 0  # nhap 2Hz: 0.25s bat - 0.25s tat
     draw_alert_bar(frame, alert_text, blink_on)
