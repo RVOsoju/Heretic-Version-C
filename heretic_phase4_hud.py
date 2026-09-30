@@ -21,7 +21,7 @@ import cv2
 import numpy as np
 
 from tactical_hud_renderer import WARN_RANGE_M, render_hud
-from tactical_slm import TacticalAlertGater, evaluate_alert
+from tactical_slm import TacticalAlertGater, call_ollama, evaluate_alert
 from tactical_telemetry_feed import TelemetryFeed, is_friendly_by_gps, read_soldier_gps
 
 FRAME_WIDTH = 1280
@@ -132,7 +132,9 @@ def main():
     parser.add_argument("--soldier-gps", metavar="LAT,LON",
                         help="Toa do lich thu cong, vi du: 21.0333,105.7333")
     parser.add_argument("--gps-port", metavar="PORT",
-                        help="Doc NEO-6M cua lich qua USB TTL, vi du: /dev/ttyUSB0")
+                        help="Doc NEO-6M cua lich qua USB TTL, vi du: /dev/ttyUSB0 (Windows: COM5)")
+    parser.add_argument("--cpu", action="store_true",
+                        help="Chay YOLO tren CPU - de nguyen VRAM cho SLM (laptop 4GB VRAM)")
     args = parser.parse_args()
 
     # Toa do lich: --gps-port (phan cuong) > --soldier-gps (thua tay) > muc dinh
@@ -181,17 +183,25 @@ def main():
     from ultralytics import YOLO
     model = YOLO("yolo26n.pt")
 
+    # Warmup SLM: tai mo hinh len GPU truoc, tranh dong 4-5s o canh bao dau tien
+    try:
+        call_ollama("Tra ve dung 1 tu: An toan", timeout=120)
+        print("[INFO] SLM da nong, san sang canh bao.")
+    except Exception as exc:
+        print(f"[CANH CAO] SLM chua san sang (Ollama chua chay?): {exc}")
+
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
     cx, cy = FRAME_WIDTH // 2, FRAME_HEIGHT // 2
     print("🔥 [HERETIC C - PHASE 4] HUD san sang. Bam 'q' de thoat.")
 
+    yolo_device = "cpu" if args.cpu else None
     while cap.isOpened():
         success, frame = cap.read()
         if not success:
             break
-        results = model(frame, stream=False, verbose=False)
+        results = model(frame, stream=False, verbose=False, device=yolo_device)
         tactical = build_tactical_data(results, cx, cy, PIXEL_TO_METER, model.names,
                                        friendly_fn)
         alert = evaluate_alert(enemies_payload(tactical), gater)
