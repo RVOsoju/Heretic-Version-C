@@ -1,87 +1,147 @@
-# Danh Sach Phan Cuong (BOM) - Heretic Version C
+# Danh sách phần cứng (BOM) — Heretic Version C
 
-Trang thai: chua muac - chua duoc xac nhan so luong thuc te.
-Ngay cap nhat: 2026-09-29
+**Trạng thái:** chưa mua — cần xác nhận trước khi đặt hàng.
+**Ngày cập nhật:** 2026-09-30
 
-## 1. Danh sach linh phan
+Hệ thống gồm 3 node:
 
-| # | Linh phan | So luong | Muc dich su dung | Ghi chu |
+```
+┌─────────────────────┐      WiFi (UDP 8888)      ┌──────────────────────────┐
+│   FLYCAM (UAV)      │ ─────────────────────────> │   LAPTOP CỦA LÍNH        │
+│   ESP32 + NEO-6M    │      JSON 1Hz             │   HUD + SLM + Telemetry  │
+└─────────────────────┘                           └──────────────────────────┘
+                                                        ^
+                                                        │ USB TTL (NMEA)
+                                               ┌──────────────────────────┐
+                                               │   LÍNH: NEO-6M           │
+                                               └──────────────────────────┘
+```
+
+- **Flycam**: mang camera giám sát + bo ESP32/NEO-6M, phát vị trí của chính nó (node `uav`) qua WiFi.
+- **Lính**: mang NEO-6M, nối thẳng về laptop qua USB TTL để xác định vị trí trung tâm (cùng cơ chế `read_soldier_gps()` đã viết sẵn).
+- **Laptop**: chạy HUD (Phase 4), SLM cảnh báo (Ollama) và listener UDP nhận vị trí UAV + các đồng đội.
+
+> **Nguyên tắc phân loại:** ai mang module GPS có tín hiệu tươi (< 5 giây) và nằm trong bán kính 8 m quanh mục tiêu YOLO phát hiện → **đồng đội** (vẽ xanh, không cảnh báo). Ngược lại → **địch** (vẽ đỏ, cảnh báo theo ngưỡng 100 m / 10 m / 1 m).
+
+---
+
+## 1. Danh sách linh kiện chính
+
+| # | Linh kiện | Số lượng | Mục đích sử dụng | Ghi chú |
 |---|-----------|----------|------------------|---------|
-| 1 | Flycam (drone) co camera | 1 | Nod UAV: mang camera giai diem + bo phan GPS/ESP32 de tham chieu vi tri tu tren cao | FPV quad nho (2.5-5 inch) la du |
-| 2 | GPS NEO-6M (5Hz, co anten patch) | 2 | (a) Gach tren flycam: vi tri UAV. (b) Mang theo lich: vi tri lich (`read_soldier_gps`) | Co san anten, khong can anten rieng |
-| 3 | ESP32 DevKitC (WROOM-32, co WiFi) | 1 | Gach tren flycam: doc NMEA tu NEO-6M, broadcast UDP JSON 1Hz den laptop (nod `uav`) | Chi can 1 vi duy nhat flycam phat; lich doc truyen thong qua USB |
-| 4 | Adapter USB TTL (CH340 hoac FTDI) | 1 | Nod lich: neu NEO-6M USB (FTDI) hoac doc thong qua USB TTL | Laptop nhan `/dev/ttyUSB0` |
-| 5 | Buck converter 5V -> 3.3V (LM2596, 1A) | 1 | Nod flycam: cap 3.3V cho ESP32 + NEO-6M tu BEC 5V cua FC | Cap 500mA peak cua ESP32 WiFi |
-| 6 | Tuyen tu 100uF + 10uF (ceramic) | 2 | Loc nguon: 100uF dau vao, 10uF dau ra buck, tranh ESP32 reset khi WiFi bat | |
-| 7 | Duong day jumper (mau, duong that) | 1 bo | No day test tren breadboard | |
-| 8 | Breadboard 830 diem | 1 | No test bo flycam truoc khi lap len drone | |
-| 9 | Laptop co WiFi (cua lich) | 1 | Chay HUD + Ollama SLM + `TelemetryFeed` UDP port 8888 | Da co |
-| 10 | Day USB Type-C / Micro-USB | 1 | No day / cap nang ESP32 khi test ban | |
-| 11 | Battery 18650 + charger (tu chon) | 1 | Nuoc phan flycam khi bay xa BEC cua FC | Chi can neu BEC FC khong du ampe |
+| 1 | Flycam (drone) có camera giám sát | 1 | Node UAV: mang camera + bo ESP32/NEO-6M làm tham chiếu vị trí từ trên cao | FPV quad 2,5–5 inch là đủ |
+| 2 | GPS NEO-6M (5 Hz, kèm anten patch) | 2 | (a) Gắn flycam → vị trí UAV. (b) Mang theo lính → vị trí lính (`read_soldier_gps()`) | Ra toạ độ sau ~10–30 s có trời; baud 9600, NMEA `$GPRMC` |
+| 3 | ESP32 DevKitC (WROOM-32, WiFi 2,4 GHz) | 1 | Gắn flycam: đọc NMEA từ NEO-6M, broadcast UDP JSON 1 Hz tới laptop | Chỉ flycam cần phát; bên lính đọc theo UART nên không cần thêm |
+| 4 | Adapter USB TTL (CH340 hoặc FTDI) | 1 | Node lính: cầu nối NEO-6M ↔ laptop; nhận `/dev/ttyUSB0` trên Linux | Dùng cho cả test bàn và field |
+| 5 | Buck converter 5 V → 3,3 V (LM2596, 1 A) | 1 | Node flycam: lấy 3,3 V từ BEC 5 V của FC để cấp cho ESP32 + NEO-6M | Phải chịu peak ~500 mA khi ESP32 phát WiFi |
+| 6 | Tụ lọc 100 µF (điện giải) + 10 µF (ceramic) | 2 | Lọc nguồn: 100 µF đầu vào, 10 µF đầu ra của buck — chống ESP32 tự reset khi bật WiFi | Bắt buộc, ESP32 rất nhạy nhiễu nguồn |
+| 7 | Dây jumper (màu, đực-thực, đủ loại) | 1 bộ | Nối mạch test trên breadboard | ~40 sợi là đủ |
+| 8 | Breadboard 830 điểm | 1 | Gắn thử toàn bộ bo flycam trước khi lắp lên drone | Test ở bàn với nguồn 5 V ngoài |
+| 9 | Laptop có WiFi | 1 | Chạy HUD + Ollama SLM + `TelemetryFeed` (UDP port 8888) | Đã có |
+| 10 | Cáp USB Type-C / Micro-USB | 1–2 | Nạp firmware và cấp nguồn khi test ESP32 trên bàn | — |
+| 11 | Pin 18650 + sạc (tùy chọn) | 1 | Cấp nguồn flycam khi bay xa, BEC của FC không đủ dòng | Chỉ cần nếu FC không có BEC 5 V/2 A |
 
-### Tu chon - cho tuong lai (WiFi khong che phuc duoc)
+## 2. Tuỳ chọn — cho tương lai (vượt ngoài phạm vi WiFi)
 
-| # | Linh phan | So luong | Muc dich |
+| # | Linh kiện | Số lượng | Mục đích |
 |---|-----------|----------|----------|
-| 12 | Module LoRa SX1276 915MHz (M5Stack hoac RFM95) | 2 | Thay UDP khi bay ra ngoai pham vi WiFi: flycam + lich trao doi vi tri truc tiep, khong can mang |
-| 13 | Anten LoRa 915MHz 3.5mm | 2 | Kem moi module LoRa tren |
+| 12 | Module LoRa SX1276 915 MHz (M5Stack hoặc RFM95) | 2 | Thay UDP khi bay ra ngoài vùng phủ WiFi: flycam ↔ lính trao đổi vị trí trực tiếp, không cần mạng |
+| 13 | Anten LoRa 915 MHz (jack 3,5 mm) | 2 | Kèm mỗi module LoRa ở trên |
 
-## 2. No day nod FLYCAM (ESP32 + NEO-6M)
+> Khi cần LoRa, `TelemetryFeed` giữ nguyên — chỉ thêm tầng nhận LoRa rồi đổ dữ liệu vào cùng dict `_latest`.
 
-```
-BEC 5V (FC flycam)  ---->  LM2596 (set 3.3V)
-                              |
-              3V3 <-----------+----------- 3V3  (NEO-6M)
-              GND <-----------+----------- GND  (chung)
-                              |
-              ESP32 3V3 <-----+
-              ESP32 GND
+---
 
-NEO-6M TX  --->  ESP32 GPIO16 (RX2)
-NEO-6M RX  --->  ESP32 GPIO17 (TX2)
-```
-
-- No test tren breadboard truoc: day 5V tu adapter, kiem tra `serial monitor` co $GPRMC khong.
-- Trong bay: NEO-6M dat tren diem cao nhat, anten patch huong len, khong che phia sau FC/mot den.
-- Khoi luong them: ~25g (NEO-6M ~6g + ESP32 ~10g + day/nguon ~9g) - duoc voi quad 5 inch.
-
-## 3. No day nod LICH (NEO-6M + laptop)
+## 3. Sơ đồ nối — Node FLYCAM (ESP32 + NEO-6M)
 
 ```
-NEO-6M 5V  <---  USB laptop (5V)
-NEO-6M TX  --->  USB TTL RX
-NEO-6M GND  ---  USB TTL GND
+BEC 5 V (FC flycam) ──► LM2596 (vặn ra 3,3 V)
+                            │
+             3V3 ◄──────────┼────────── 3V3  (NEO-6M VCC)
+             GND ◄──────────┼────────── GND  (chung mass)
+                            │
+             ESP32 3V3 ◄────┘
+
+NEO-6M TX  ──►  ESP32 GPIO16 (RX2)
+NEO-6M RX  ──►  ESP32 GPIO17 (TX2)
+NEO-6M GND ──►  ESP32 GND
 ```
 
-- Chay: `python heretic_phase4_hud.py --telemetry --gps-port /dev/ttyUSB0`
-- Neu chua co fix GPS trong nha: dung `--soldier-gps 21.0333,105.7333` thay the.
+**Ngân sách nguồn (3,3 V):**
 
-## 4. Firmware ESP32 (cach bai khi co may)
+| Thiết bị | Dòng trung bình | Dòng peak |
+|----------|-----------------|-----------|
+| ESP32 (WiFi) | ~180 mA | ~500 mA |
+| NEO-6M | ~40 mA | ~50 mA |
+| **Tổng** | **~220 mA** | **~550 mA** |
 
-Firmware rieng (Arduino/C++) - chua viet, se viet khi co ESP32. Gioi han can thuc hien:
+→ LM2596 1 A là dư; BEC 5 V của FC cần ≥ 1,5 A.
 
-- Doc UART 9600 baud, parse `$GPRMC` (chinh xac giuong `tactical_telemetry_feed.py:_nmea_coord`).
-- 1Hz: `WiFi UDP send` JSON den IP laptop, port 8888:
-  `{"id": "uav", "lat": 21.0333, "lon": 105.7333, "t": 1727600000.12}`
-- IP laptop: gan dong IP (static DHCP) de ESP32 khong mat lien ket.
-- `TelemetryFeed` da co san: tin hieu > 5s coi la mat (`STALE_AFTER_S`), dot tren minimap bi xoa tu dong.
+**Quy tắc lắp trên drone:**
 
-## 5. Nguyen tac phan loai dong doi (da thiet ke trong code)
+1. Test trên breadboard trước: cấp 5 V từ adapter, mở Serial Monitor 9600 baud — phải thấy dòng `$GPRMC` liên tục mới được lắp lên.
+2. NEO-6M đặt ở điểm cao nhất của flycam, anten patch hướng **lên trời**, không đặt sau FC, mô-tơ hay pin (nhiễu + che tín hiệu).
+3. Cáp ngắn, gọn; gá bo ESP32 phía dưới, không che anten GPS.
+4. Khối lượng thêm: ~25 g (NEO-6M ~6 g + ESP32 ~10 g + nguồn/dây ~9 g) — an toàn cho quad 5 inch.
 
-- Co tin hieu GPS moi (< 5s) trong ban kinh 8m quanh muc tieu duoc YOLO phat hien
-  -> **dong doi**: ve xanh, khong bat canh bao SLM.
-- Khong co -> **dich**: ve do, bat canh bao theo ngat ngan (100m / 10m / 1m).
-- Cod: `is_friendly_by_gps()` trong `tactical_telemetry_feed.py`, duoc kep vao
-  `heretic_phase4_hud.py` qua flag `--telemetry`.
+## 4. Sơ đồ nối — Node LÍNH (NEO-6M + laptop)
 
-## 6. Chi phi tham khao (VND, gia 2026)
+```
+Laptop USB (5 V) ──► NEO-6M VCC
+NEO-6M TX  ──►  USB TTL RX
+NEO-6M GND ──►  USB TTL GND
+```
 
-| Nhom | Uoc tinh |
+**Cách dùng trong code:**
+
+```bash
+# Khi có phần cứng:
+python heretic_phase4_hud.py --telemetry --gps-port /dev/ttyUSB0
+
+# Khi chưa có GPS (trong nhà):
+python heretic_phase4_hud.py --telemetry --soldier-gps 21.0333,105.7333
+```
+
+- `--telemetry`: bật listener UDP port 8888 (nhận `uav` + các đồng đội) + bật nhận biết đồng đội.
+- `--gps-port`: đọc toạ độ lính từ NEO-6M qua serial.
+- `--soldier-gps`: khai báo toạ độ lính thủ công (test không cần phần cứng).
+- Nếu GPS chưa có fix (trong nhà): code in cảnh báo và tự fallback về toạ độ mặc định.
+
+## 5. Yêu cầu firmware ESP32 (viết khi có máy)
+
+Firmware riêng (Arduino/C++) — **chưa viết**, sẽ viết ngay khi có ESP32. Giao diện bắt buộc phải khớp `tactical_telemetry_feed.py`:
+
+1. Đọc UART **9600 baud**, parse `$GPRMC` (đúng logic `_nmea_coord()` đã có sẵn trong code — có mẫu để sao chép).
+2. Mỗi **1 giây** gửi 1 UDP datagram JSON đến **IP laptop, port 8888**:
+
+   ```json
+   {"id": "uav", "lat": 21.0333, "lon": 105.7333, "t": 1727600000.12}
+   ```
+
+   - `id`: `"uav"` (hoặc id của đồng đội nếu sau này gắn thêm node).
+   - `t`: timestamp giây (epoch) tại thời điểm phát.
+3. **Gán IP tĩnh cho laptop** (DHCP reservation trong router) để ESP32 không mất liên kết khi IP đổi.
+4. Nếu GPS chưa fix (trường `GPRMC` = `V`/`N`): **không gửi**, tránh phủ vị trí cũ bằng dữ liệu rác.
+
+> Bên nhận (`TelemetryFeed`) đã tự xử lý: tín hiệu > 5 giây coi là mất, chấm trên minimap tự biến mất, không cần firmware lo.
+
+## 6. Quy trình test khi phần cứng về
+
+1. **Bàn làm việc:** NEO-6M + USB TTL → laptop. Chạy `read_soldier_gps()` — thấy `(lat, lon)` là qua.
+2. **Bo flycam:** breadboard 5 V → LM2596 → ESP32 + NEO-6M. Serial Monitor thấy `$GPRMC`. Nạp firmware dummy gửi UDP 1 Hz.
+3. **Mô phỏng end-to-end:** laptop chạy `heretic_phase4_hud.py --sim --telemetry`; ESP32 (hoặc script giả lập) phát UDP → chấm UAV/dồng đội xuất hiện đúng vị trí trên minimap.
+4. **Bay:** lắp lên flycam, bay vòng quanh vị trí đứng, quan sát chấm UAV di chuyển đúng quỹ đạo; đứng cạnh đồng đội mang GPS → mục tiêu YOLO chuyển xanh, SLM im lặng.
+
+---
+
+## 7. Chi phí tham khảo (VND, giá 2026)
+
+| Nhóm | Ước tính |
 |------|----------|
-| NEO-6M x2 | 250k - 400k |
-| ESP32 DevKitC | 100k - 150k |
-| USB TTL CH340 | 30k - 50k |
-| LM2596 + tuyen tu + day + breadboard | 100k - 150k |
-| 18650 + charger (tu chon) | 100k - 200k |
-| LoRa x2 + anten (tu chon) | 300k - 500k |
-| **Tong (khong goi flycam/laptop)** | **~1M - 1.5M VND** |
+| NEO-6M × 2 | 250k – 400k |
+| ESP32 DevKitC | 100k – 150k |
+| USB TTL CH340 | 30k – 50k |
+| LM2596 + tụ + dây + breadboard | 100k – 150k |
+| 18650 + sạc (tùy chọn) | 100k – 200k |
+| LoRa × 2 + anten (tùy chọn) | 300k – 500k |
+| **Tổng (không gồm flycam/laptop)** | **~1 – 1,5 triệu VND** |
