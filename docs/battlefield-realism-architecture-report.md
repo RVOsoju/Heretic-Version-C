@@ -3,6 +3,7 @@
 **Dự án:** Heretic Version C — HUD chiến thuật cho lính (YOLO + SLM Ollama + HUD + telemetry GPS)
 **Ngày:** 2026-10-01
 **Trạng thái:** Đề xuất — làm cơ sở quyết định phase tiếp theo
+**Cập nhật 2026-10-07:** Tier A2 (TTS giọng nói) bị thay bằng **haptic rung im lặng** (OPSEC) — scope hiện hành xem [project-overview-pdr.md](project-overview-pdr.md)
 **Runtime target:** Laptop Asus TUF F15 (RTX 3050 4GB VRAM, i7-12700H, 16GB RAM)
 **Giả định liên kết:** "không có WiFi" = không có hạ tầng dân dụng; **được phép dựng link riêng** (LoRa/mesh/FPV)
 
