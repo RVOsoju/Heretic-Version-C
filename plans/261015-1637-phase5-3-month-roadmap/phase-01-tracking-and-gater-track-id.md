@@ -12,7 +12,9 @@ dependencies: []
 ## Overview
 
 W1–W2: bật ByteTrack trên yolo26n, tính vận tốc + tốc độ tiếp cận theo track, chuyển gater
-từ key `(target, bearing)` sang `track_id`. W1 thuần code — **UAV được cấp chưa rõ ngày về**
+từ key `(target, bearing)` sang `track_id`; **object-height anchor** (W2) — tự hiệu chuẩn
+scale m/px theo chiều cao box (người = thước 1.7m) thay constant `PIXEL_TO_METER = 0.05`
+(sai ×1.5–3 ở độ cao bay 30–50m). W1 thuần code — **UAV được cấp chưa rõ ngày về**
 (quyết định 2026-10-15), test 360P bằng video tổng hợp (downscale 720p → 640×360).
 Khi UAV về tay: phá 3 điểm mù (B1 downlink, B2 MAVLink, B3 GPS) + retest 360P frame thật (B6).
 M1 done = AC1–AC3.
@@ -22,6 +24,11 @@ M1 done = AC1–AC3.
 **Functional**
 - Track ID ổn định giữa các khung (ByteTrack, `persist=True`).
 - Tính vận tốc (m/s) + tốc độ tiếp cận (approach, m/s — dương = đang tới gần) cho mỗi track.
+- **Object-height anchor (W2)**: scale m/px tự hiệu chuẩn mỗi khung = kích thước thật class
+  / chiều cao box (px) — thay constant 0.05 (hiệu chuẩn cho ~15–22m, sai ×1.5–3 ở độ cao
+  bay 30–50m). Bảng: `person/soldier 1.7, motorcycle 1.6, car 1.5, truck/bus 3.5, boat 1.5,
+  military_vehicle 3.0` (m). Fallback 0.05 khi class không có trong bảng hoặc `box_h < 8px`
+  (quá xa, box không đủ tin). Không cần phần cứng mới; giảm nhẹ B1 (không phụ thuộc alt UAV).
 - Gater key theo `track_id`: mục tiêu cắt ngưỡng 100m một lần → cảnh báo đúng 1 lần, không lặp khi track dịch chuyển.
 - 360P (W1): chạy model hiện tại trên 10 frame 640×360 tổng hợp, log precision (B6 bước 1).
 - Khi UAV về tay (chưa rõ ngày): xác định loại downlink video, hỗ trợ MAVLink/GCS, nguồn vị trí GPS (B1–B3); retest 360P frame thật (B6).
@@ -40,8 +47,10 @@ Data flow:
 frame (720p/360P)
   → YOLO yolo26n: model.track(persist=True, tracker="bytetrack.yaml")
       → boxes: (cls, xyxy, id=track_id)
+  → scale frame = CLASS_HEIGHT_M[cls] / box_h_px  (object-height anchor, W2;
+      fallback PIXEL_TO_METER 0.05 nếu cls không có bảng hoặc box_h < 8px)
   → TrackStore (tactical_tracker.py): per track_id, history (t, cx_px, cy_px, dist_m) 30 khung
-      → velocity_mps = Δpx/Δt × PIXEL_TO_METER (0.05, heretic_phase4_hud.py:29)
+      → velocity_mps = Δpx/Δt × scale frame
       → approach_mps = −d(dist_m)/dt
   → tactical dict: {target, track_id, distance_m, bearing, approach_mps, box, side}
   → TacticalAlertGater: key = track_id (fallback (target, bearing) khi không có track — chế độ --sim)
@@ -59,7 +68,7 @@ Phase 3 (variant tuần tra Phase 4 build trước, không chờ).
 - `test_tracking.py` — test AC1 + AC2 trên video tổng hợp (không cần phần cứng).
 
 **Modify**
-- `heretic_phase4_hud.py` — `:204` gọi `model.track(...)` thay `model(...)`; `build_tactical_data` (`:60`) thêm `track_id`, `approach_mps`; `enemies_payload` (`:80`) truyền `track_id`; thêm flag `--model`.
+- `heretic_phase4_hud.py` — `:204` gọi `model.track(...)` thay `model(...)`; `build_tactical_data` (`:60`) thêm `track_id`, `approach_mps`; `enemies_payload` (`:80`) truyền `track_id`; thêm flag `--model`; **object-height anchor**: bảng `CLASS_HEIGHT_M` + scale = `height / box_h_px` trong `calculate_tactical_telemetry` (`:41`, fallback 0.05).
 - `tactical_slm.py` — `TacticalAlertGater._key` (`:56-57`) + dict `last_warned` (`:53`): ưu tiên `track_id`, fallback key cũ.
 - `test_telemetry_chain.py` — thêm kịch bản AC3: mục tiêu cắt ngưỡng 100m một lần → đúng 1 cảnh báo.
 
@@ -82,18 +91,24 @@ Phase 3 (variant tuần tra Phase 4 build trước, không chờ).
    ~10 frame, người ở ~10–30m) → chạy yolo26n, log precision vào register B6.
    *(Nếu UAV về tay trong W1: xác định thêm downlink (B1), QGroundControl (B2), GPS onboard
    (B3) — ghi kết quả vào `plan.md`.)*
-6. **W2d1–2** — tạo `test_tracking.py`: video tổng hợp numpy 150 khung 30fps, 1 người di chuyển
+6. **W2d1** — object-height anchor: bảng `CLASS_HEIGHT_M` + `calculate_tactical_telemetry`
+   (`heretic_phase4_hud.py:41`): `scale = CLASS_HEIGHT_M[cls] / box_h_px` (fallback 0.05 nếu
+   cls không có bảng hoặc `box_h < 8px`); verify nhanh: 1 frame 30m tổng hợp → distance sai
+   <25% so ground truth (trước khi có anchor: sai ×1.5–3).
+7. **W2d2–3** — tạo `test_tracking.py`: video tổng hợp numpy 150 khung 30fps, 1 người di chuyển
    thẳng tốc độ biết trước → chạy `model.track` → (a) đếm lần đổi ID / tổng khung (re-ID rate),
-   (b) so `velocity` tính được với ground truth. In PASS/FAIL + số đo.
-7. **W2d3–4** — `test_telemetry_chain.py`: thêm case AC3 — payload mục tiêu đi 105m → 95m
+   (b) so `velocity` tính được với ground truth (scale height anchor). In PASS/FAIL + số đo.
+8. **W2d4** — `test_telemetry_chain.py`: thêm case AC3 — payload mục tiêu đi 105m → 95m
    (cắt ngưỡng 100m một lần, giữ track_id) → assert `evaluate_alert` trả cảnh báo đúng 1 lần.
-8. **W2d5** — chạy full suite: `test_tracking.py`, `test_telemetry_chain.py`,
+9. **W2d5** — chạy full suite: `test_tracking.py`, `test_telemetry_chain.py`,
    `heretic_phase4_hud.py --sim` (16 khung) → sign-off M1.
 
 ## Success Criteria
 
 - [ ] `python test_tracking.py` PASS: ≥100 khung, re-ID <5% — **AC1**
 - [ ] `python test_tracking.py` PASS: vận tốc tính được sai <10% so ground truth sim — **AC2**
+- [ ] Object-height anchor: distance trên sim tổng hợp (độ cao 30m) sai <25% so ground truth
+      (trước anchor: sai ×1.5–3 do constant 0.05) — nuôi AC2/AC3
 - [ ] `python test_telemetry_chain.py` PASS: mục tiêu cắt ngưỡng 100m một lần → đúng 1 cảnh báo, không lặp — **AC3**
 - [ ] `python heretic_phase4_hud.py --sim` chạy xong 16 khung, cảnh báo đúng nhịp (không regression)
 - [ ] 360P step 1: precision 10 frame 640×360 tổng hợp đã log vào B6 (W1)
@@ -109,3 +124,4 @@ Phase 3 (variant tuần tra Phase 4 build trước, không chờ).
 | UAV về trễ / thiếu tài liệu (đã xác nhận: chưa rõ ngày về, 2026-10-15) | W1–W4 sim-first, không phụ thuộc UAV; W5–W8 chỉ cần variant video W6 + bay thật W8/W9; B1–B3 verify khi UAV về, trước W9 (field test); buffer W12 |
 | Chất lượng 360P yếu (B6) | Ghi nhận W1, tune imgsz/NMS ở W6 (Phase 3); không block M1 |
 | Track ID thay đổi làm gater báo lặp | AC3 test chính xác scenario này; gater reset khi track_id mới xuất hiện trong `warn_range` |
+| Object-height anchor: người ngồi/đằng người (box ngắn) → over-estimate distance | `box_h < 8px` → fallback scale 0.05; bảng kích thước theo class; log scale mỗi track để kiểm tra drift; W7 (tam giác phân GPS) là model chính, anchor là cầu nối + fallback khi UAV không gửi alt |

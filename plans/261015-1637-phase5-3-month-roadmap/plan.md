@@ -30,7 +30,7 @@ không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ 
 | Tuần | Ngày | Deliverable | Verify |
 |------|------|-------------|--------|
 | **W1** | 19/10–25/10 | Bật ByteTrack (`track=True, bytetrack.yaml` trên yolo26n); test 360P bằng video **tổng hợp** (downscale 720p → 640×360) — **UAV chưa rõ ngày về, W1 thuần code** | `model.track()` trả `boxes.id` ổn định trên clip 30s; log precision 360P (B6 bước 1) |
-| **W2** | 26/10–01/11 | Velocity + approach speed; gater re-key theo `track_id`; `test_tracking.py` → **M1 done** | AC1: re-ID <5%/100 khung · AC2: sai vận tốc <10% · AC3: cắt ngưỡng 100m 1 lần → báo đúng 1 lần |
+| **W2** | 26/10–01/11 | Velocity + approach speed; **object-height anchor** (scale tự hiệu chuẩn theo chiều cao box — thay constant 0.05 sai ×1.5–3 ở 30–50m); gater re-key theo `track_id`; `test_tracking.py` → **M1 done** | AC1: re-ID <5%/100 khung · AC2: sai vận tốc <10% (scale anchor, distance sim 30m sai <25%) · AC3: cắt ngưỡng 100m 1 lần → báo đúng 1 lần |
 | **W3** | 02/11–08/11 | Tải MVRSD (verify Baidu; fallback AMAD/InvictusRex) + **VisDrone** (góc drone: person + 4 xe); **verify tham số thu** (độ cao/tốc độ/FOV) từ dataset card; prep data, map 8 class; **research nguồn `soldier`** (B9 — ưu tiên footage UAV tự quay) | `mvrsd-8c.yaml` hợp lệ, 3000 ảnh trên server; VisDrone subset 5 class; **tham số thu UAV ghi vào report**; B9 có kết quả |
 | **W4** | 09/11–15/11 | Fine-tune yolo26n → 8 class (MVRSD + **VisDrone** + `soldier` + COCO regression) + regression check → **M2 done** | `yolo val` mAP50 ≥0.75 (val MVRSD+VisDrone); mAP 6 class COCO giảm ≤5 điểm; tham số thu UAV ghi báo cáo (AC7) |
 | **W5** | 16/11–22/11 | **Sim-first**: dựng bench 2 node (laptop + node 2) + WireGuard, `udp_position_sender.py` — không phụ thuộc UAV | `wg show` 2 peer active; ping <20ms; `test_vpn_link.py` PASS (AC5 phần bench) |
@@ -196,3 +196,19 @@ phát hiện (xuyến 30–40m trên 360P) khỏi tầm đo (GPS) → ngưỡng 
 **Impact:** phase-04 (tactical_geolocation.py, `alt` payload, đo FOV/alt → B1, success
 criteria +1, risk +1) · PDR (header, S1, Scope OUT, AC2, §7 step 5, rủi ro, open Q6) ·
 plan.md (W7, B1, open Q6) · supervisor-briefing (header, §3 Q&A mới, §4 điểm trung thực).
+
+### Session 4 — 2026-10-16 (object-height anchor — cầu nối W2)
+
+**Câu hỏi (user):** pixel distance có khó khăn gì, cách nào tốt hơn? Hướng tiếp cận
+xác định thế nào?
+**Verify:** `PIXEL_TO_METER = 0.05` hiệu chuẩn cho footprint 32×18m → độ cao ~15–22m;
+ở độ cao bay plan 30–50m scale thật 0.064–0.16 → **sai hệ thống ×1.5–3** (cảnh báo
+100m trigger thực ở ~35–70m). Bearing hiện tại: atan2 4 hướng, giả định cạnh trên ảnh
+= Bắc → sai khi UAV quay đầu.
+**Decisions (user chốt):** thêm **object-height anchor vào Phase 1 (W2)** — scale =
+kích thước thật class / chiều cao box (bảng `CLASS_HEIGHT_M`), fallback 0.05 khi
+`box_h < 8px`; ±15–25%, không cần phần cứng, giảm nhẹ B1. W7 (tam giác phân GPS) vẫn
+là model chính. Hướng tiếp cận W7: bearing = atan2(GPS target − GPS lính) (la bàn thật,
+không phụ thuộc camera) + "đang tiếp cận" = dR/dt < 0 từ velocity track.
+**Impact:** phase-01 (overview, requirements, architecture, W2d1 mới, success +1, risk +1) ·
+PDR (header, S1, Scope OUT, AC2, rủi ro) · plan.md (W2) · supervisor-briefing (§3, §4).

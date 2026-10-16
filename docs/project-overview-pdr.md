@@ -1,7 +1,7 @@
 # PDR — Heretic Version C: Target, Scope & Acceptance Criteria
 
 **Dự án:** HUD chiến thuật cho lính — YOLO + SLM Ollama (tiếng Việt) + HUD + telemetry UAV
-**Ngày:** 2026-10-07 · **Cập nhật:** 2026-10-16 (feedback giảng viên: **dataset góc UAV** + **UAV theo dõi mục tiêu** + **FOV indicator** + **khoảng cách target→lính = tam giác phân GPS** — UAV bay vòng quanh lính, không bay trên đầu; 2026-10-15: không tài trợ, mạng riêng WiFi/4G+VPN, UAV được cấp 360P+ — **chưa rõ ngày về**, 8 class chốt: person/soldier + 5 xe thường + military_vehicle)
+**Ngày:** 2026-10-07 · **Cập nhật:** 2026-10-16 (feedback giảng viên: **dataset góc UAV** + **UAV theo dõi mục tiêu** + **FOV indicator** + **khoảng cách target→lính = tam giác phân GPS** (W7) + **object-height anchor** (W2) — UAV bay vòng quanh lính, không bay trên đầu; 2026-10-15: không tài trợ, mạng riêng WiFi/4G+VPN, UAV được cấp 360P+ — **chưa rõ ngày về**, 8 class chốt: person/soldier + 5 xe thường + military_vehicle)
 **Runtime target:** Asus TUF F15 FX507 — RTX 3050 (4GB VRAM), i7-12700H, 16GB DDR4, **Windows 11**
 **Kịch bản:** 1 lính + 1 UAV. Phi sát thương — chỉ phát hiện + cảnh báo, không vũ khí tự động.
 
@@ -35,7 +35,7 @@ chưa chạy được đủ AC1–AC11 (AC4 = chế độ fallback hình ảnh c
 
 | # | Mục | Chi tiết | AC |
 |---|-----|----------|----|
-| S1 | **Tracking (ByteTrack)** | Real-time; track_id ổn định; tính **vận tốc + tốc độ tiếp cận**; gater chuyển key từ `(target, bearing)` sang `track_id`; **nhiều target → cảnh báo target gần nhất** (câu SLM + HUD có khoảng cách m + hướng từ lính); **khoảng cách target→lính = tam giác phân GPS** (GPS UAV + alt + góc chúi + FOV + pixel → lat/lon target → 2D tới lính, ±10–15%) từ W7 — model pixel-scale hiện tại chỉ đúng khi UAV bay trên đầu | AC1–AC3 |
+| S1 | **Tracking (ByteTrack)** | Real-time; track_id ổn định; tính **vận tốc + tốc độ tiếp cận**; gater chuyển key từ `(target, bearing)` sang `track_id`; **nhiều target → cảnh báo target gần nhất** (câu SLM + HUD có khoảng cách m + hướng từ lính); **khoảng cách target→lính**: W2 **object-height anchor** (scale = kích thước thật class / chiều cao box, ±15–25%, không cần alt UAV) → W7 **tam giác phân GPS** (GPS UAV + alt + góc chúi + FOV + pixel → lat/lon target → 2D tới lính, ±10–15%) — model pixel-scale cố định 0.05 chỉ đúng ở độ cao ~15–22m (sai ×1.5–3 ở 30–50m) | AC1–AC3 |
 | S2 | **Kênh cảnh báo im lặng** | **Hiện tại: HUD flash + SLM (chưa có module rung).** Haptic (Arduino + motor) giữ làm mục blocked — bật lại khi có phần cứng, AC4 fallback = flash hình <100ms | AC4 |
 | S3 | **Mạng riêng WiFi/4G + VPN (WireGuard)** | **Thay LoRa** (quyết định 2026-10-15). UDP transport giữ nguyên, thêm lớp VPN; **interface `TelemetryFeed` không đổi**; link đứt → chế độ cục bộ TTL 5s (đã có `STALE_AFTER_S`) | AC5 |
 | S4 | **UAV tuần tra + FOV + theo dõi** | Flycam bay theo lộ trình quanh vị trí người được bảo vệ (MAVLink nếu UAV hỗ trợ, nếu không = bay tay theo route gợi ý); laptop vẽ **vùng phủ camera** (cone) lên minimap; **chế độ follow: UAV bay theo vị trí mục tiêu** (sim: theo track; real: MAVLink GOTO / HUD chỉ hướng cho phi công); **indicator target trong/ngoài tầm nhìn UAV**; mode sim khi chưa bay thật | AC6 |
@@ -63,7 +63,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 - Mesh đa lính / node RPi–Jetson / NPU trên UAV — **Tier C** (kiến trúc mesh-ready: model `Track`, `TelemetryFeed` là điểm hội tụ).
 - Triển khai thật: anti-jam, rugged, mật mã đầy đủ, nguồn điện >2h.
 - **Thermal ban đêm** — Phase 6, không tính trong done.
-- Khoảng cách **đo** thật (stereo/ToF/LiDAR) — từ W7 dùng **tam giác phân GPS từ UAV** (±10–15%); stereo/ToF = Phase 6.
+- Khoảng cách **đo** thật (stereo/ToF/LiDAR) — W2: object-height anchor (±15–25%); từ W7: **tam giác phân GPS từ UAV** (±10–15%); stereo/ToF = Phase 6.
 - CQB <10m, nhóm mục tiêu di chuyển rất nhanh — YOLO không hứa.
 - Target 0,2s cho SLM — **không đạt được** (floor ~0,4s qua Ollama API, đã đo).
 
@@ -72,7 +72,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 | # | Tiêu chí | Cách verify | Ngưỡng pass |
 |---|----------|-------------|-------------|
 | AC1 | Track ID ổn định | `test_tracking.py` (mới) trên video sim: 1 người di chuyển liên tục | ≥100 khung, re-ID <5% |
-| AC2 | Tốc độ tiếp cận | Cùng script, so vel tính được với ground truth sim (W7: re-verify trên sim UAV bay vòng + tam giác phân GPS) | Sai <10% |
+| AC2 | Tốc độ tiếp cận | Cùng script, so vel tính được với ground truth sim (W2: scale object-height anchor; W7: re-verify trên sim UAV bay vòng + tam giác phân GPS) | Sai <10% |
 | AC3 | Gater theo track_id + target gần nhất | `test_telemetry_chain.py` (update): mục tiêu cắt ngưỡng 100m một lần; payload 3 target → chọn gần nhất | Báo đúng 1 lần, không lặp; câu cảnh báo có **khoảng cách + hướng** của target gần nhất |
 | AC4 | Cảnh báo im lặng | **Fallback:** gater trigger → HUD flash; (haptic khi có phần cứng: decide→rung <200ms) | Flash <100ms, **không phát âm** |
 | AC5 | Mạng riêng VPN | Bench 2 node qua WiFi + WireGuard: HUD nhận position 1Hz; cắt link mô phỏng đứt | Bench: sai <1m so sim; đứt link → local mode sau ≤5s, không crash |
@@ -133,6 +133,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 | UAV không hỗ trợ MAVLink/GCS | S4 fallback: bay tay theo route gợi ý trên map + FOV + HUD chỉ hướng cho follow — vẫn đạt AC6 (sim + bay thật) |
 | VisDrone license / tham số thu chưa verify | Verify license + độ cao thu ở W3; fallback: MVRSD + COCO + footage tự quay (ghi trade-off trong báo cáo) |
 | **alt/FOV của UAV được cấp chưa biết** (input tam giác phân GPS) | B1: đo khi UAV về (bay 30m, marker 10m, đếm pixel) + verify alt; sim nominal h=30m, FOV 60° tới đó; re-verify trước W9 |
+| Object-height anchor: người ngồi/đằng người (box ngắn) → over-estimate | `box_h < 8px` → fallback scale 0.05; bảng kích thước theo class; W7 GPS là model chính, anchor là cầu nối + fallback |
 
 ## 10. Câu hỏi mở (chưa giải quyết)
 

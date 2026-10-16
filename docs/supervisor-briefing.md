@@ -75,10 +75,12 @@ hoặc HUD chỉ hướng + khoảng cách cho phi công bay theo.
 **Vòng demo = đúng yêu cầu: bay trên đầu → đi cùng theo → đo khoảng cách (m) + hướng → cảnh báo.**
 
 **Hỏi: UAV bay vòng (không trên đầu lính) thì tính khoảng cách target→lính thế nào?** —
-*Tối ưu (W7):* code hiện tại chỉ đúng khi UAV bay **thẳng trên đầu** (scale pixel phẳng);
-UAV bay vòng → chuyển **tam giác phân GPS**: GPS UAV + **độ cao (alt)** + góc chúi camera
-+ FOV + vị trí pixel target → **lat/lon target trên mặt đất** → khoảng cách + hướng tới
-lính (cả hai có GPS). Sai số **±10–15%** (thay ±30–50% của scale pixel). Bay vòng
+*Cải tiến 2 bước:* (W2) **object-height anchor** — người phát hiện chính là thước đo:
+scale = 1.7m / chiều cao box (px), tự hiệu chuẩn mỗi khung, **±15–25%, không cần alt UAV**
+(sửa ngay lỗi hệ thống ×1.5–3 của scale cố định 0.05 ở độ cao bay 30–50m). (W7)
+**tam giác phân GPS**: GPS UAV + **độ cao (alt)** + góc chúi camera + FOV + pixel target →
+**lat/lon target trên mặt đất** → khoảng cách + hướng tới lính (cả hai có GPS), **±10–15%**;
+bearing = la bàn thật từ 2 GPS, không phụ thuộc hướng camera. Bay vòng
 **tách 2 phạm vi**: tầm phát hiện (xuyến camera→target, 360P chỉ ~30–40m) với tầm đo
 (GPS, không giới hạn) → ngưỡng 100m vẫn đạt: vòng bán kính 60–80m + follow mode.
 
@@ -92,7 +94,8 @@ lính (cả hai có GPS). Sai số **±10–15%** (thay ±30–50% của scale p
 | Chuỗi telemetry UAV: GPS → UDP 1Hz → HUD | **11/11 kiểm thử PASS** (kèm ảnh minh chứng) | `test_telemetry_chain.py` |
 | Tối ưu cho laptop 4GB VRAM (chạy thật, không phải server) | Dual-mode GPU/CPU (`--cpu`), warmup SLM, guide cài đặt Windows 11 | `laptop-deployment-guide.md` |
 
-**Điểm trung thực (không che):** khoảng cách hiện là ước tính scale pixel (±30–50%) — từ W7
+**Điểm trung thực (không che):** khoảng cách hiện là scale pixel cố định (±30–50%,
+sai ×1.5–3 ở độ cao bay 30–50m) — từ W2 sang object-height anchor (±15–25%), từ W7
 sang tam giác phân GPS (±10–15%),
 chưa có track ID, chưa hoạt động ban đêm, link đang UDP/WiFi (chưa có VPN),
 cảnh báo im lặng chưa có module rung — đây chính là các mục Phase 5.
