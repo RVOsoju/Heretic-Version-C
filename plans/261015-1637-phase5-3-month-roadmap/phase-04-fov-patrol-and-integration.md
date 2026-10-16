@@ -11,11 +11,12 @@ dependencies: [phase-01, phase-02, phase-03]
 
 ## Overview
 
-W7–W8: vẽ vùng phủ camera (cone FOV) của UAV lên minimap + logic tuần tra —
-**build variant B (route gợi ý bay tay) trước**, chạy được mọi trường hợp;
-variant A (MAVLink upload mission) chỉ viết thêm nếu B2=yes khi UAV về tay
-(chưa rõ ngày, 2026-10-15). W8: tích hợp full (tracking + model 8 class +
-camera 360P + telemetry qua VPN) với 3 chế độ degradation và link-loss test.
+W7–W8: vẽ vùng phủ camera (cone FOV) của UAV lên minimap + **badge target trong/ngoài
+tầm nhìn** + logic tuần tra + **chế độ follow: UAV bay theo vị trí mục tiêu**
+(yêu cầu giảng viên 2026-10-16) — build variant B (route gợi ý bay tay + HUD chỉ hướng)
+trước, chạy được mọi trường hợp; variant A (MAVLink upload mission / GOTO) chỉ viết thêm
+nếu B2=yes khi UAV về tay (chưa rõ ngày, 2026-10-15). W8: tích hợp full (tracking +
+model 8 class + camera 360P + telemetry qua VPN) với 3 chế độ degradation và link-loss test.
 M4 done = AC6 + AC8.
 
 ## Requirements
@@ -23,9 +24,16 @@ M4 done = AC6 + AC8.
 **Functional**
 - Cone FOV: vị trí UAV (từ `TelemetryFeed`) + hướng bay → đa giác cone (FOV 90°, tầm ~300m)
   vẽ lên minimap, chuyển động theo UAV.
-- Tuần tra: lộ trình waypoint (5 điểm). **Variant A** (MAVLink hỗ trợ — B2): upload mission
-  tự động. **Variant B** (không hỗ trợ): route gợi ý vẽ trên minimap + danh sách console,
-  phi công bay tay theo.
+- Tuần tra: lộ trình waypoint (5 điểm) quanh vị trí người được bảo vệ. **Variant A**
+  (MAVLink hỗ trợ — B2): upload mission tự động. **Variant B** (không hỗ trợ): route
+  gợi ý vẽ trên minimap + danh sách console, phi công bay tay theo.
+- **Follow mode** (yêu cầu giảng viên 2026-10-16): có target nguy hiểm trong `warn_range`
+  → UAV bay theo vị trí ước tính của target — sim: `uav_patrol_sim.py` chuyển waypoint
+  sang vị trí target mỗi tick (smoothing centroid track 5 khung); real: MAVLink GOTO
+  (variant A) / HUD chỉ hướng + khoảng cách cho phi công (variant B). Target ra khỏi
+  `warn_range` → UAV về route tuần tra.
+- **FOV indicator**: target trong/ngoài cone FOV → badge HUD "MỤC TIÊU TRONG TẦM NHÌN" /
+  "NGOÀI TẦM NHÌN" — dot-in-polygon test (rẻ, không ăn fps).
 - 3 chế độ: **FULL** (video + vị trí) / **POS-ONLY** (mất video) / **LOCAL** (mất mọi link) —
   badge chế độ hiện trên HUD; chuyển chế độ ≤5s, không crash.
 - `--sim` chạy full pipeline offline (route sim + video file).
@@ -46,6 +54,11 @@ hướng UAV: MAVLink (A) / 2 điểm GPS cách 5s (B) / --uav-heading (thủ c�
 uav_patrol_sim.py: list waypoint (lat, lon) → interpol 5 m/s → phát UDP 8888 1Hz
   {"id":"uav","lat","lon","t"} (đúng format hardware-bom §5) → TelemetryFeed (closed loop sim)
   + vẽ đường route lên minimap
+  Follow mode: có target trong warn_range → waypoint = vị trí target (centroid track,
+  smoothing 5 khung) → UAV "bay theo" target; hết target → về route tuần tra
+
+tactical_uav_fov.py: point_in_cone(target_xy, cone) → bool → badge HUD
+  "MỤC TIÊU TRONG TẦM NHÌN" / "NGOÀI TẦM NHÌN"
 
 Variant A only: uav_mavlink_controller.py (pymavlink): connect radio USB →
   MISSION_ITEM_INT upload → ARM + TAKEOFF → follow waypoint
@@ -59,13 +72,13 @@ Chế độ (heretic_phase4_hud.py):
 ## Related Code Files
 
 **Create**
-- `tactical_uav_fov.py` — `fov_cone(...) → [(dx,dy), ...]` (toạ độ equirectangular local, cùng hệ `tactical_telemetry_feed.py:79-80`) + hàm `draw_fov_cone(frame, ox, oy, px_per_m, cone)` để renderer không phình.
-- `uav_patrol_sim.py` — lộ trình waypoint, phát UDP 8888 1Hz, vẽ route.
+- `tactical_uav_fov.py` — `fov_cone(...) → [(dx,dy), ...]` (toạ độ equirectangular local, cùng hệ `tactical_telemetry_feed.py:79-80`) + hàm `draw_fov_cone(frame, ox, oy, px_per_m, cone)` + `point_in_cone(target_xy, cone) → bool` (FOV indicator) để renderer không phình.
+- `uav_patrol_sim.py` — lộ trình waypoint, phát UDP 8888 1Hz, vẽ route, **follow mode** (bay theo vị trí target).
 - `uav_mavlink_controller.py` — **chỉ nếu variant A** (B2=yes); pymavlink.
 - `test_degradation_modes.py` — bật full → kill video → kill telemetry → assert chuyển chế độ + không crash.
 
 **Modify**
-- `tactical_hud_renderer.py` — `draw_minimap` (`:55`) thêm tham số `uav_cone=None`; `render_hud` (`:129`) thêm `mode_text` badge.
+- `tactical_hud_renderer.py` — `draw_minimap` (`:55`) thêm tham số `uav_cone=None`; `render_hud` (`:129`) thêm `mode_text` badge + text **FOV indicator**.
 - `heretic_phase4_hud.py` — tính heading + cone, truyền vào `render_hud`; phát hiện chế độ; flag `--uav-heading`.
 
 **Delete** — không.
@@ -80,11 +93,14 @@ Chế độ (heretic_phase4_hud.py):
    (giữ buffer nhỏ); fallback `--uav-heading`; truyền cone vào `render_hud`.
 4. **W7d4** — `uav_patrol_sim.py`: 5 waypoint quanh vị trí lính (bán kính 50–80m),
    tốc độ 5 m/s, phát UDP 8888 1Hz (format `hardware-bom.md` §5); vẽ đường route
-   (dashed) lên minimap.
-5. **W7d5** — **variant tuần tra B build trước** (route gợi ý: route trên map + print danh
-   sách waypoint console cho phi công) — chạy được mọi trường hợp, không phụ thuộc UAV.
+   (dashed) lên minimap. **Follow mode**: có target trong `warn_range` → waypoint =
+   vị trí target (centroid track, smoothing 5 khung); hết target → về route
+   (yêu cầu giảng viên 2026-10-16: UAV đi cùng theo vật thể).
+5. **W7d5** — FOV indicator: `point_in_cone` + badge HUD; **variant tuần tra B build trước**
+   (route gợi ý: route trên map + print danh sách waypoint console cho phi công + HUD chỉ
+   hướng/khoảng cách khi follow) — chạy được mọi trường hợp, không phụ thuộc UAV.
    Nếu B2=yes (khi UAV về tay): viết thêm `uav_mavlink_controller.py`
-   (pymavlink: connect `COMx`, upload MISSION, ARM, TAKEOFF, GOTO).
+   (pymavlink: connect `COMx`, upload MISSION, ARM, TAKEOFF, GOTO mục tiêu).
 6. **W8d1** — `heretic_phase4_hud.py`: phát hiện chế độ FULL/POS-ONLY/LOCAL mỗi khung
    (rẻ: 2 flag boolean); badge qua `render_hud(mode_text=...)`.
 7. **W8d2** — `test_degradation_modes.py`: source file + sender UDP → FULL; kết thúc file
@@ -98,6 +114,9 @@ Chế độ (heretic_phase4_hud.py):
 
 - [ ] `python heretic_phase4_hud.py --sim` + `uav_patrol_sim.py`: cone FOV hiện đúng hướng,
       di chuyển theo route waypoint — **AC6** (sim)
+- [ ] Follow mode: `--sim` + target di động → UAV sim bay theo vị trí target (khoảng cách
+      UAV→target giảm khi target tiến lại), hết target → về route — **AC6**
+- [ ] FOV indicator: target trong cone → badge "TRONG TẦM NHÌN"; ngoài → "NGOÀI TẦM NHÌN" — **AC6**
 - [ ] Bay thật (nếu bay được): cone lệch hướng bay thực <45° — **AC6** (real)
 - [ ] `python test_degradation_modes.py` PASS: FULL→POS-ONLY→LOCAL, mỗi chuyển ≤5s, không crash — **AC5/AC8**
 - [ ] Chạy tích hợp 10 phút: ≥15fps, không crash, badge chế độ hiện — **AC8**
@@ -112,3 +131,4 @@ Chế độ (heretic_phase4_hud.py):
 | `tactical_hud_renderer.py` vượt 200 dòng | Hàm vẽ cone tách sẵn trong `tactical_uav_fov.py`; renderer chỉ gọi |
 | Chạy 10 phút OOM VRAM 4GB | YOLO `--cpu` (SLM giữ GPU) — fallback đã có từ Phase 4 cũ, stress test chính ở W10 |
 | Bay thật bị thời tiết/sân bay chặn | PDR §7 cho phép "replay video 360P"; demo vẫn đạt AC11, ghi lý do không bay thật |
+| Follow target jitter (vị trí target ước tính ±30–50%) | Smoothing centroid 5 khung; chỉ follow khi track ổn định (confidence ≥0.5, ≥10 khung); sim chấp nhận sai số, ghi rõ trong báo cáo |

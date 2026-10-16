@@ -31,11 +31,11 @@ không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ 
 |------|------|-------------|--------|
 | **W1** | 19/10–25/10 | Bật ByteTrack (`track=True, bytetrack.yaml` trên yolo26n); test 360P bằng video **tổng hợp** (downscale 720p → 640×360) — **UAV chưa rõ ngày về, W1 thuần code** | `model.track()` trả `boxes.id` ổn định trên clip 30s; log precision 360P (B6 bước 1) |
 | **W2** | 26/10–01/11 | Velocity + approach speed; gater re-key theo `track_id`; `test_tracking.py` → **M1 done** | AC1: re-ID <5%/100 khung · AC2: sai vận tốc <10% · AC3: cắt ngưỡng 100m 1 lần → báo đúng 1 lần |
-| **W3** | 02/11–08/11 | Tải MVRSD (verify Baidu từ server; fallback AMAD/InvictusRex), prep data, map 8 class; **research nguồn ảnh class `soldier`** (B9) | `mvrsd-8c.yaml` hợp lệ, 3000 ảnh trên server; mapping label xe quân sự → `military_vehicle`; B9 có kết quả (dataset mở / footage tự ghi) |
-| **W4** | 09/11–15/11 | Fine-tune yolo26n → 8 class (6 COCO + `soldier` + `military_vehicle`) + regression check COCO → **M2 done** | `yolo val` mAP50 ≥0.75 (val MVRSD); mAP 6 class COCO giảm ≤5 điểm (AC7) |
+| **W3** | 02/11–08/11 | Tải MVRSD (verify Baidu; fallback AMAD/InvictusRex) + **VisDrone** (góc drone: person + 4 xe); **verify tham số thu** (độ cao/tốc độ/FOV) từ dataset card; prep data, map 8 class; **research nguồn `soldier`** (B9 — ưu tiên footage UAV tự quay) | `mvrsd-8c.yaml` hợp lệ, 3000 ảnh trên server; VisDrone subset 5 class; **tham số thu UAV ghi vào report**; B9 có kết quả |
+| **W4** | 09/11–15/11 | Fine-tune yolo26n → 8 class (MVRSD + **VisDrone** + `soldier` + COCO regression) + regression check → **M2 done** | `yolo val` mAP50 ≥0.75 (val MVRSD+VisDrone); mAP 6 class COCO giảm ≤5 điểm; tham số thu UAV ghi báo cáo (AC7) |
 | **W5** | 16/11–22/11 | **Sim-first**: dựng bench 2 node (laptop + node 2) + WireGuard, `udp_position_sender.py` — không phụ thuộc UAV | `wg show` 2 peer active; ping <20ms; `test_vpn_link.py` PASS (AC5 phần bench) |
 | **W6** | 23/11–29/11 | Video source abstraction (`--source webcam/rtsp/uvc/file`); hiệu chỉnh YOLO cho 360P → **M3 done** | ≥15fps @360P; người trong khung → cảnh báo <2s (nửa AC8) |
-| **W7** | 30/11–06/12 | Cone FOV trên minimap + logic tuần tra (MAVLink waypoints nếu hỗ trợ, nếu không = route gợi ý tay) | `--sim` lộ trình waypoint: cone đúng hướng, di chuyển theo route (AC6 sim) |
+| **W7** | 30/11–06/12 | Cone FOV trên minimap + **badge target trong/ngoài tầm nhìn** + tuần tra + **chế độ follow target** (MAVLink nếu hỗ trợ, nếu không = route gợi ý tay + HUD chỉ hướng) | `--sim` lộ trình waypoint: cone đúng hướng, **UAV bay theo vị trí mục tiêu** (AC6 sim) |
 | **W8** | 07/12–13/12 | Tích hợp full: telemetry qua VPN, 3 chế độ degradation (full/position-only/local), link-loss test → **M4 done** | AC6 (bay thật nếu được, nếu không sim+bench); AC8: 10 phút live ổn định; cắt link → local ≤5s không crash |
 | **W9** | 14/12–20/12 | Field test 1 với UAV được cấp (5 kịch bản, ghi log + video) | Log: 5/5 kịch bản chạy, issue list đã triage (critical/minor) |
 | **W10** | 21/12–27/12 | Stress: VRAM 4GB, link loss, latency + fix | AC9: <3.8GB/30s, OOM → `--cpu` khởi động lại OK; 5 vòng cắt/ghép link ≤5s |
@@ -85,11 +85,11 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 |----|----------|--------|-------------|
 | AC1 | Track ID ổn định | `test_tracking.py` trên video sim | ≥100 khung, re-ID <5% |
 | AC2 | Tốc độ tiếp cận | Cùng script, so với ground truth sim | Sai <10% |
-| AC3 | Gater theo track_id | `test_telemetry_chain.py` (update) | Cắt ngưỡng 100m 1 lần → báo đúng 1 lần |
+| AC3 | Gater theo track_id + target gần nhất | `test_telemetry_chain.py` (update) | Cắt ngưỡng 100m 1 lần → báo đúng 1 lần; 3 target → SLM chọn gần nhất, câu có khoảng cách + hướng |
 | AC4 | Cảnh báo im lặng (fallback) | gater trigger → HUD flash | Flash <100ms, không phát âm |
 | AC5 | Mạng riêng VPN | `test_vpn_link.py`: 2 node WiFi + WireGuard | HUD nhận position 1Hz, sai <1m so sim; đứt link → local ≤5s, không crash |
-| AC6 | UAV patrol + FOV | `--sim` lộ trình waypoints (bay thật ở W8) | Cone FOV đúng hướng, di chuyển theo route |
-| AC7 | YOLO 8 class | `yolo val` val MVRSD + 1 clip có lính + xe quân sự | mAP50 ≥0.75; `soldier` + `military_vehicle` được box + SLM cảnh báo; mAP 6 COCO giảm ≤5 điểm; weight chạy trên 3050 (pin version ultralytics server=laptop) |
+| AC6 | UAV patrol + FOV + follow | `--sim` lộ trình waypoints + target di động (bay thật ở W8) | Cone FOV đúng hướng; **UAV sim bay theo vị trí target**; badge trong/ngoài tầm nhìn đúng |
+| AC7 | YOLO 8 class (góc UAV) | `yolo val` val MVRSD+VisDrone + 1 clip có lính + xe quân sự | mAP50 ≥0.75; `soldier` + `military_vehicle` được box + SLM cảnh báo; mAP 6 COCO giảm ≤5 điểm; weight chạy trên 3050 (pin version ultralytics server=laptop); **tham số thu (độ cao/tốc độ/FOV) ghi báo cáo** |
 | AC8 | UAV được cấp live | Video 360P+ → HUD | ≥15fps; người trong khung → cảnh báo <2s |
 | AC9 | VRAM 4GB | `nvidia-smi -l 1` 30s đầu chạy full; cố tình OOM | <3.8GB ổn định; `--cpu` khởi động lại bình thường |
 | AC10 | SLM | Log `--sim` | <1.5s/call (warm); câu ≤12 từ, tiếng Việt |
@@ -152,3 +152,31 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 - phase-02: 8 class mới, mapping `military_vehicle`, B9, multi-GPU, pin version.
 - phase-03: sim-first, variant chốt khi UAV về.
 - phase-04: variant B (bay tay theo route) build trước; variant A (MAVLink) chỉ nếu B2=yes.
+
+### Session 2 — 2026-10-16 (feedback giảng viên sau buổi trình bày)
+
+**Feedback (tóm):** dataset phải rõ số đối tượng + cụ thể gì; **dataset thu từ UAV**
+(độ cao, tốc độ, tham số — đặc thù UAV); nhiều object → cảnh báo cái **gần nhất**;
+**ngưỡng khoảng cách** → cảnh báo người bảo vệ; người được bảo vệ gửi **vị trí liên tục**
+để xác định hướng; target **trong tầm nhìn UAV** không; **UAV bay theo đối tượng**
+(tóm lại: bay trên đầu → đi cùng → đo khoảng cách m + hướng → cảnh báo).
+
+**Đã có sẵn (verify code, không sửa):** target gần nhất — `tactical_slm.py:104`
+(`closest = min(alerting, key=distance)`); ngưỡng 100m/−10m/−1m — `tactical_slm.py:48`;
+vị trí lính 1Hz → `distance_m` + `bearing` — `heretic_phase4_hud.py:61-72`;
+câu SLM đã có khoảng cách + hướng (SYSTEM_PROMPT example).
+
+**Decisions mới:**
+- **Dataset góc UAV**: thêm **VisDrone** (ảnh drone: person, car, motorcycle, truck, bus)
+  làm nguồn chính; MVRSD verify tham số thu (độ cao) từ dataset card; footage UAV thật
+  tự quay (độ cao 30–50m, 3–5 m/s) = gold standard + nguồn `soldier` (B9);
+  **tham số thu ghi vào báo cáo đồ án** (AC7).
+- **Follow mode UAV** (Phase 4): sim = bay theo vị trí target (smoothing centroid track);
+  real = MAVLink GOTO (variant A) / HUD chỉ hướng + khoảng cách cho phi công (variant B).
+- **FOV indicator** (Phase 4): `point_in_cone(target_xy, cone)` → badge
+  "MỤC TIÊU TRONG/NGOÀI TẦM NHÌN".
+- Kịch bản demo §7 PDR: thêm step follow + câu cảnh báo có m + hướng.
+
+**Impact:** PDR (S1/S4/S5, bảng dataset 8 class, AC3/AC6/AC7, §7, rủi ro VisDrone) ·
+plan.md (W3/W4/W7, KPI) · phase-02 (VisDrone + tham số thu) · phase-04 (follow + FOV
+indicator) · supervisor-briefing (mục trả lời feedback).

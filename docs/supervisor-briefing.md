@@ -1,6 +1,7 @@
 # Heretic Version C — Báo Cáo Trình Bày Cho Giảng Viên Hướng Dẫn
 
-**Ngày:** 2026-10-12 · **Cập nhật:** 2026-10-15 (quyết định: không tài trợ → dùng thiết bị có sẵn;
+**Ngày:** 2026-10-12 · **Cập nhật:** 2026-10-16 (feedback giảng viên: dataset góc UAV + UAV theo dõi
+mục tiêu + FOV indicator — mục §3) · 2026-10-15 (quyết định: không tài trợ → dùng thiết bị có sẵn;
 LoRa → mạng riêng WiFi/4G + WireGuard; haptic blocked → flash HUD; 8 class chốt mới; plan 12 tuần)
 **Thời lượng dự kiến:** 10–15 phút
 **Tài liệu chi tiết đi kèm:** `project-overview-pdr.md` (scope + tiêu chuẩn nghiệm thu) ·
@@ -16,16 +17,19 @@ qua GPS → cảnh báo qua 3 kênh: **hình** (bounding box + minimap), **im l�
 (FLASH HUD <100ms — OPSEC, không lộ vị trí; haptic rung khi có phần cứng),
 và **câu chữ AI** (SLM tiếng Việt, cho màn chỉ huy). Chạy thời gian thực trên laptop cá nhân
 (RTX 3050 4GB), liên kết UAV qua **mạng riêng WiFi/4G + WireGuard VPN**
-— không phụ thuộc hạ tầng dân dụng. Kịch bản: **1 lính + 1 UAV được cấp**.
+— không phụ thuộc hạ tầng dân dụng. Kịch bản: **1 lính + 1 UAV được cấp** —
+UAV bay quanh vị trí người được bảo vệ và **bay theo mục tiêu phát hiện**.
 
 ## 2. Target & scope (tóm tắt — chi tiết trong PDR)
 
 - **Mục đích:** demo/đồ án đạt **70–80% sát thực tế chiến trường**.
-- **Definition of done = Phase 5 (12 tuần):** tracking (track ID ổn định, tốc độ tiếp cận) +
-  cảnh báo im lặng (flash) + mạng riêng VPN + UAV tuần tra có vùng phủ +
+- **Definition of done = Phase 5 (12 tuần):** tracking (track ID ổn định, tốc độ tiếp cận,
+  cảnh báo target gần nhất) + cảnh báo im lặng (flash) + mạng riêng VPN + UAV tuần tra có
+  vùng phủ + **follow target + FOV indicator** +
   YOLO 8 class chốt 2026-10-15: `person, soldier, car, motorcycle, truck, bus, boat,
   military_vehicle` — gộp mọi xe quân sự thành 1 class, loại máy bay, phân biệt
-  người thường/lính (fine-tune MVRSD trên server 4× GPU, pin version cho laptop).
+  người thường/lính (fine-tune MVRSD + VisDrone — góc UAV — trên server 4× GPU,
+  pin version cho laptop).
 - **Mỗi mục scope gắn 1 acceptance criteria đo được** (PDR §5, AC1–AC11) — ví dụ:
   track ID re-ID <5% trên 100 khung; flash cảnh báo <100ms không phát âm;
   mAP50 ≥0,75 trên val MVRSD; VRAM <3,8GB; demo end-to-end 10 phút không interrupt.
@@ -33,7 +37,43 @@ và **câu chữ AI** (SLM tiếng Việt, cho màn chỉ huy). Chạy thời gi
   server dev 4× RTX 5000 Ada, UAV được cấp (camera 360P+). Haptic/thermal/mesh đa lính
   = Phase 6, chỉ khi có phần cứng/tài trợ.
 
-## 3. Đã hoàn thành (có bằng chứng)
+## 3. Trả lời feedback giảng viên (2026-10-16)
+
+**Hỏi: dataset bao nhiêu đối tượng, cụ thể gì?** — **8 class**: `person` (dân thường),
+`soldier` (kẻ địch), `car, motorcycle, truck, bus, boat` (xe thường),
+`military_vehicle` (gộp mọi xe quân sự).
+
+**Hỏi: dataset phải thu từ UAV — độ cao, tốc độ thế nào?**
+
+| Class | Nguồn | Góc quay |
+|-------|------|----------|
+| `military_vehicle` | MVRSD ~3000 ảnh | Drone/satellite (độ cao thu ghi trong báo cáo) |
+| `person, car, motorcycle, truck, bus` | **VisDrone** (dataset drone) + COCO subset | Drone |
+| `soldier` | Footage UAV thật tự quay / dataset mở | **UAV thật** |
+
+Tham số thu (ghi trong báo cáo đồ án): **độ cao 30–50m, tốc độ 3–5 m/s, camera hướng
+xuống/tilt trước, target 10–50m ≈ 20–60 px**.
+
+**Hỏi: nhiều object → cảnh báo cái nào?** — *Đã có trong code:* `closest =
+min(alerting, key=distance)` ([tactical_slm.py:104](../tactical_slm.py)) + prompt
+"chỉ lấy target gần nhất".
+
+**Hỏi: ngưỡng khoảng cách → cảnh báo?** — Ngưỡng **100m**: <100m bắt đầu, mỗi giảm 10m
+báo 1 lần, <10m mỗi giảm 1m (`tactical_slm.py:48`); cắt ngưỡng 1 lần → đúng 1 cảnh báo (AC3).
+
+**Hỏi: xác định hướng — người được bảo vệ gửi vị trí liên tục?** — GPS người được bảo vệ →
+**1Hz** (`TelemetryFeed` UDP 8888) → C2 tính **khoảng cách (m) + hướng** từ người được
+bảo vệ đến target; câu SLM có cả hai: "CẢNH BÁO: Kẻ địch cách 95m hướng Đông".
+
+**Hỏi: target có trong tầm nhìn UAV không?** — *Mới (W7):* badge HUD
+**"MỤC TIÊU TRONG/NGOÀI TẦM NHÌN"** (test điểm trong cone FOV 90°, tầm 300m).
+
+**Hỏi: UAV bay trên đầu đối tượng, đi cùng theo vật thể?** — *Mới (W7–W8):* **chế độ
+follow** — sim: UAV bay tới vị trí ước tính target; real: MAVLink GOTO (nếu UAV hỗ trợ)
+hoặc HUD chỉ hướng + khoảng cách cho phi công bay theo.
+**Vòng demo = đúng yêu cầu: bay trên đầu → đi cùng theo → đo khoảng cách (m) + hướng → cảnh báo.**
+
+## 4. Đã hoàn thành (có bằng chứng)
 
 | Thành phần | Trạng thái | Bằng chứng |
 |------------|-----------|------------|
@@ -47,7 +87,7 @@ và **câu chữ AI** (SLM tiếng Việt, cho màn chỉ huy). Chạy thời gi
 chưa có track ID, chưa hoạt động ban đêm, link đang UDP/WiFi (chưa có VPN),
 cảnh báo im lặng chưa có module rung — đây chính là các mục Phase 5.
 
-## 4. Kiến trúc (5 nguyên tắc — chi tiết trong báo cáo kiến trúc)
+## 5. Kiến trúc (5 nguyên tắc — chi tiết trong báo cáo kiến trúc)
 
 1. **Quyết định ở edge** — node lính tự quyết "tôi bị đe dọa" cục bộ, không chờ trạm chỉ huy.
 2. **Trạm chỉ huy (laptop) là optional** — mất nó, lính vẫn có cảm biến + cảnh báo cục bộ.
@@ -60,14 +100,14 @@ cảnh báo im lặng chưa có module rung — đây chính là các mục Phas
 Lưu lượng hệ thống rất nhỏ (~30 byte/s/node) → mạng riêng WiFi/4G + WireGuard **đủ**,
 không cần hạ tầng riêng.
 
-## 5. Kế hoạch & ngân sách (Phase 5 — 12 tuần, chi tiết trong `plans/`)
+## 6. Kế hoạch & ngân sách (Phase 5 — 12 tuần, chi tiết trong `plans/`)
 
 | Mốc | Tuần | Nội dung |
 |-----|------|----------|
 | M1 | W1–W2 | Tracking ByteTrack + gater theo track_id (AC1–AC3) |
 | M2 | W3–W4 | Fine-tune YOLO 8 class MVRSD, multi-GPU, pin version (AC7) — song song M1 |
 | M3 | W5–W6 | Mạng riêng WiFi/4G + WireGuard (bench 2 node) + camera 360P (AC5, nửa AC8) |
-| M4 | W7–W8 | Cone FOV + tuần tra + tích hợp full 3 chế độ degradation (AC6, AC8) |
+| M4 | W7–W8 | Cone FOV + **follow target** + FOV indicator + tuần tra + tích hợp full 3 chế độ degradation (AC6, AC8) |
 | M5 | W9–W12 | Field test + stress + demo E2E 10 phút + tài liệu (AC9–AC11, W12 buffer) |
 
 **Ngân sách: 0 VND mua mới** — dùng laptop TUF F15 + server dev 4× RTX 5000 Ada +
@@ -77,7 +117,7 @@ UAV được cấp. Phần cứng mới (haptic, ESP32 node, thermal) chỉ khi 
 UAV chưa rõ ngày về (B1–B3 → verify khi UAV về, trước W9); nguồn ảnh class `soldier` (B9 → W3d3);
 truy cập Baidu (B5 → W3d1); 360P chất lượng (B6 → W1 bước 1, retest khi UAV về)…
 
-## 6. Rủi ro chính
+## 7. Rủi ro chính
 
 | Rủi ro | Mitigation |
 |--------|------------|
@@ -87,18 +127,19 @@ truy cập Baidu (B5 → W3d1); 360P chất lượng (B6 → W1 bước 1, retes
 | Không có nguồn ảnh class `soldier` (B9) | Research W3d3; fallback: tự ghi footage thao trường; nếu không → escalate (giữ 7 class) |
 | Fine-tune 8 class degrade 6 class COCO cũ | Trộn MVRSD + COCO trong 1 train; AC7: mAP COCO giảm ≤5 điểm |
 
-## 7. Câu hỏi cần ý kiến giảng viên
+## 8. Câu hỏi cần ý kiến giảng viên
 
 1. Plan 12 tuần + register điểm mù B1–B9 (mỗi điểm mù có deadline) — đã đủ rõ để theo dõi
    tiến độ tuần này qua tuần khác chưa?
-2. 8 class chốt (`person, soldier` + 5 xe thường + `military_vehicle` gộp) — chấp nhận,
-   hay cần tách lại class xe quân sự?
+2. 8 class chốt (`person, soldier` + 5 xe thường + `military_vehicle` gộp) với dataset góc UAV
+   (MVRSD drone + **VisDrone** + footage UAV tự quay, tham số thu độ cao 30–50m / 3–5 m/s
+   ghi trong báo cáo) — chấp nhận, hay cần tách lại class xe quân sự / thêm nguồn dataset?
 3. UAV được cấp chưa rõ ngày về — nếu UAV về sau W8, demo W11 chạy bằng **replay video 360P**
    (PDR cho phép) có chấp nhận không?
 4. Module rung (haptic) có khả năng được cấp thêm trước demo không? Nếu không →
    cảnh báo im lặng = flash HUD <100ms (fallback đã chốt).
 
-## 8. Danh mục tài liệu
+## 9. Danh mục tài liệu
 
 | File | Nội dung |
 |------|----------|
