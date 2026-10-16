@@ -15,7 +15,12 @@ W7–W8: vẽ vùng phủ camera (cone FOV) của UAV lên minimap + **badge tar
 tầm nhìn** + logic tuần tra + **chế độ follow: UAV bay theo vị trí mục tiêu**
 (yêu cầu giảng viên 2026-10-16) — build variant B (route gợi ý bay tay + HUD chỉ hướng)
 trước, chạy được mọi trường hợp; variant A (MAVLink upload mission / GOTO) chỉ viết thêm
-nếu B2=yes khi UAV về tay (chưa rõ ngày, 2026-10-15). W8: tích hợp full (tracking +
+nếu B2=yes khi UAV về tay (chưa rõ ngày, 2026-10-15).
+**Khoảng cách target→lính = tam giác phân GPS** (GPS UAV + **alt** + góc chúi camera +
+FOV + pixel → lat/lon target → khoảng cách 2D tới lính) — thay model pixel-scale phẳng
+(`PIXEL_TO_METER`, `heretic_phase4_hud.py:29`, chỉ đúng khi UAV bay thẳng trên đầu +
+chĩa xuống) vì UAV bay vòng quanh vị trí lính, không bay trên đầu.
+W8: tích hợp full (tracking +
 model 8 class + camera 360P + telemetry qua VPN) với 3 chế độ degradation và link-loss test.
 M4 done = AC6 + AC8.
 
@@ -34,6 +39,13 @@ M4 done = AC6 + AC8.
   `warn_range` → UAV về route tuần tra.
 - **FOV indicator**: target trong/ngoài cone FOV → badge HUD "MỤC TIÊU TRONG TẦM NHÌN" /
   "NGOÀI TẦM NHÌN" — dot-in-polygon test (rẻ, không ăn fps).
+- **Khoảng cách target→lính (tam giác phân GPS)**: thay model pixel-scale phẳng
+  (`PIXEL_TO_METER = 0.05` — chỉ đúng khi UAV thẳng trên đầu + chĩa thẳng xuống,
+  tâm ảnh = lính). Model mới: pose UAV (lat/lon + **alt**) + camera (pitch, FOV) +
+  heading + pixel target → **lat/lon target trên mặt đất** → khoảng cách + hướng tới
+  lính (cả hai có GPS). Sai số kỳ vọng ±10–15% (do độ chính xác alt + FOV chi phối).
+  Input: `alt` thêm vào payload UDP 8888; pitch = gắn cố định (đo 1 lần);
+  **FOV + alt verify/đo khi UAV về → check-list B1**.
 - 3 chế độ: **FULL** (video + vị trí) / **POS-ONLY** (mất video) / **LOCAL** (mất mọi link) —
   badge chế độ hiện trên HUD; chuyển chế độ ≤5s, không crash.
 - `--sim` chạy full pipeline offline (route sim + video file).
@@ -60,6 +72,13 @@ uav_patrol_sim.py: list waypoint (lat, lon) → interpol 5 m/s → phát UDP 888
 tactical_uav_fov.py: point_in_cone(target_xy, cone) → bool → badge HUD
   "MỤC TIÊU TRONG TẦM NHÌN" / "NGOÀI TẦM NHÌN"
 
+tactical_geolocation.py (mới): uav_pose(lat, lon, alt) + (pitch, fov) + heading + pixel (u, v)
+  → α = pitch + φ(v);  d = h·tan(α)  (h = alt)
+  → target_xy = chân UAV (nadir) + d·(heading + ψ(u))  → (lat, lon) target
+  → distance_m + bearing tới lính (2D mặt đất) — thay pixel-scale của
+  calculate_tactical_telemetry (heretic_phase4_hud.py:41-57); interface gater không đổi
+  (vẫn nhận distance_m + bearing)
+
 Variant A only: uav_mavlink_controller.py (pymavlink): connect radio USB →
   MISSION_ITEM_INT upload → ARM + TAKEOFF → follow waypoint
 
@@ -73,13 +92,14 @@ Chế độ (heretic_phase4_hud.py):
 
 **Create**
 - `tactical_uav_fov.py` — `fov_cone(...) → [(dx,dy), ...]` (toạ độ equirectangular local, cùng hệ `tactical_telemetry_feed.py:79-80`) + hàm `draw_fov_cone(frame, ox, oy, px_per_m, cone)` + `point_in_cone(target_xy, cone) → bool` (FOV indicator) để renderer không phình.
-- `uav_patrol_sim.py` — lộ trình waypoint, phát UDP 8888 1Hz, vẽ route, **follow mode** (bay theo vị trí target).
+- `uav_patrol_sim.py` — lộ trình waypoint, phát UDP 8888 1Hz (**+ trường `alt`**), vẽ route, **follow mode** (bay theo vị trí target).
 - `uav_mavlink_controller.py` — **chỉ nếu variant A** (B2=yes); pymavlink.
+- `tactical_geolocation.py` — tam giác phân GPS: `target_ground_pos(uav_latlon, alt, pitch_deg, fov, heading_deg, pixel) → (lat, lon)` + `distance_bearing(target, soldier) → (m, hướng)`.
 - `test_degradation_modes.py` — bật full → kill video → kill telemetry → assert chuyển chế độ + không crash.
 
 **Modify**
 - `tactical_hud_renderer.py` — `draw_minimap` (`:55`) thêm tham số `uav_cone=None`; `render_hud` (`:129`) thêm `mode_text` badge + text **FOV indicator**.
-- `heretic_phase4_hud.py` — tính heading + cone, truyền vào `render_hud`; phát hiện chế độ; flag `--uav-heading`.
+- `heretic_phase4_hud.py` — tính heading + cone, truyền vào `render_hud`; phát hiện chế độ; flag `--uav-heading`; **khoảng cách target→lính qua `tactical_geolocation`** (thay pixel-scale); `make_sim_frame` chiếu ground truth → pixel (sim UAV bay vòng).
 
 **Delete** — không.
 
@@ -91,14 +111,19 @@ Chế độ (heretic_phase4_hud.py):
    gọi `draw_fov_cone` sau khi vẽ chấm UAV.
 3. **W7d3** — `heretic_phase4_hud.py`: heading = `atan2` của 2 vị trí UAV cách 5s trong feed
    (giữ buffer nhỏ); fallback `--uav-heading`; truyền cone vào `render_hud`.
+   + `tactical_geolocation.py`: pose UAV + pixel → lat/lon target
+   (α = pitch + φ, d = h·tan α); khoảng cách + hướng tới lính = 2D GPS
+   (thay `calculate_tactical_telemetry` pixel-scale; interface gater không đổi).
 4. **W7d4** — `uav_patrol_sim.py`: 5 waypoint quanh vị trí lính (bán kính 50–80m),
-   tốc độ 5 m/s, phát UDP 8888 1Hz (format `hardware-bom.md` §5); vẽ đường route
-   (dashed) lên minimap. **Follow mode**: có target trong `warn_range` → waypoint =
-   vị trí target (centroid track, smoothing 5 khung); hết target → về route
+   tốc độ 5 m/s, phát UDP 8888 1Hz (format `hardware-bom.md` §5 **+ trường `alt`**);
+   vẽ đường route (dashed) lên minimap. **Follow mode**: có target trong `warn_range` →
+   waypoint = vị trí target (centroid track, smoothing 5 khung); hết target → về route
    (yêu cầu giảng viên 2026-10-16: UAV đi cùng theo vật thể).
 5. **W7d5** — FOV indicator: `point_in_cone` + badge HUD; **variant tuần tra B build trước**
    (route gợi ý: route trên map + print danh sách waypoint console cho phi công + HUD chỉ
    hướng/khoảng cách khi follow) — chạy được mọi trường hợp, không phụ thuộc UAV.
+   **Quy trình đo FOV + verify alt → check-list B1** (bay 30m, đánh dấu 2 điểm cách 10m,
+   đếm pixel; nominal sim tới lúc đó: h=30m, FOV 60°).
    Nếu B2=yes (khi UAV về tay): viết thêm `uav_mavlink_controller.py`
    (pymavlink: connect `COMx`, upload MISSION, ARM, TAKEOFF, GOTO mục tiêu).
 6. **W8d1** — `heretic_phase4_hud.py`: phát hiện chế độ FULL/POS-ONLY/LOCAL mỗi khung
@@ -106,7 +131,8 @@ Chế độ (heretic_phase4_hud.py):
 7. **W8d2** — `test_degradation_modes.py`: source file + sender UDP → FULL; kết thúc file
    video → POS-ONLY; kill sender → LOCAL ≤5s; assert không crash, log chuyển chế độ.
 8. **W8d3** — tích hợp full 10 phút: model 8 class (W4) + source 360P (W6) + telemetry VPN
-   (W5) + FOV cone; ghi hình; kiểm tra badge + fps + không crash.
+   (W5) + FOV cone + **geolocation** (sim: chiếu ground truth → pixel; khoảng cách =
+   tam giác phân GPS, không còn pixel-scale); ghi hình; kiểm tra badge + fps + không crash.
 9. **W8d4** — bay thật (nếu UAV + trời cho phép): FOV theo hướng bay thật (AC6 real);
    nếu không bay được: sign-off bằng sim + bench, ghi lý do.
 
@@ -117,6 +143,8 @@ Chế độ (heretic_phase4_hud.py):
 - [ ] Follow mode: `--sim` + target di động → UAV sim bay theo vị trí target (khoảng cách
       UAV→target giảm khi target tiến lại), hết target → về route — **AC6**
 - [ ] FOV indicator: target trong cone → badge "TRONG TẦM NHÌN"; ngoài → "NGOÀI TẦM NHÌN" — **AC6**
+- [ ] Geolocation: `--sim` UAV bay vòng (ground truth) → khoảng cách target→lính sai
+      <15%, hướng đúng — **AC6** (nuôi gater `distance_m`, interface không đổi)
 - [ ] Bay thật (nếu bay được): cone lệch hướng bay thực <45° — **AC6** (real)
 - [ ] `python test_degradation_modes.py` PASS: FULL→POS-ONLY→LOCAL, mỗi chuyển ≤5s, không crash — **AC5/AC8**
 - [ ] Chạy tích hợp 10 phút: ≥15fps, không crash, badge chế độ hiện — **AC8**
@@ -132,3 +160,4 @@ Chế độ (heretic_phase4_hud.py):
 | Chạy 10 phút OOM VRAM 4GB | YOLO `--cpu` (SLM giữ GPU) — fallback đã có từ Phase 4 cũ, stress test chính ở W10 |
 | Bay thật bị thời tiết/sân bay chặn | PDR §7 cho phép "replay video 360P"; demo vẫn đạt AC11, ghi lý do không bay thật |
 | Follow target jitter (vị trí target ước tính ±30–50%) | Smoothing centroid 5 khung; chỉ follow khi track ổn định (confidence ≥0.5, ≥10 khung); sim chấp nhận sai số, ghi rõ trong báo cáo |
+| **alt/FOV của UAV được cấp chưa biết** (input của tam giác phân) | B1: đo khi UAV về (bay 30m, marker 10m, đếm pixel) + verify alt; tới đó sim dùng nominal h=30m, FOV 60°; re-verify thực trước W9; sai số ±10–15% truyền vào ngưỡng gater 100m → kiểm tra ở W8d3 |

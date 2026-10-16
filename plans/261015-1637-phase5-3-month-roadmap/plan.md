@@ -35,7 +35,7 @@ không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ 
 | **W4** | 09/11–15/11 | Fine-tune yolo26n → 8 class (MVRSD + **VisDrone** + `soldier` + COCO regression) + regression check → **M2 done** | `yolo val` mAP50 ≥0.75 (val MVRSD+VisDrone); mAP 6 class COCO giảm ≤5 điểm; tham số thu UAV ghi báo cáo (AC7) |
 | **W5** | 16/11–22/11 | **Sim-first**: dựng bench 2 node (laptop + node 2) + WireGuard, `udp_position_sender.py` — không phụ thuộc UAV | `wg show` 2 peer active; ping <20ms; `test_vpn_link.py` PASS (AC5 phần bench) |
 | **W6** | 23/11–29/11 | Video source abstraction (`--source webcam/rtsp/uvc/file`); hiệu chỉnh YOLO cho 360P → **M3 done** | ≥15fps @360P; người trong khung → cảnh báo <2s (nửa AC8) |
-| **W7** | 30/11–06/12 | Cone FOV trên minimap + **badge target trong/ngoài tầm nhìn** + tuần tra + **chế độ follow target** (MAVLink nếu hỗ trợ, nếu không = route gợi ý tay + HUD chỉ hướng) | `--sim` lộ trình waypoint: cone đúng hướng, **UAV bay theo vị trí mục tiêu** (AC6 sim) |
+| **W7** | 30/11–06/12 | Cone FOV trên minimap + **badge target trong/ngoài tầm nhìn** + tuần tra + **chế độ follow target** (MAVLink nếu hỗ trợ, nếu không = route gợi ý tay + HUD chỉ hướng) + **tam giác phân GPS** (`tactical_geolocation.py`: pose UAV + pixel → lat/lon target; `alt` vào payload UDP; đo FOV → B1) | `--sim` lộ trình waypoint: cone đúng hướng, **UAV bay theo vị trí mục tiêu**, **khoảng cách target→lính sai <15%** so ground truth (AC6 sim) |
 | **W8** | 07/12–13/12 | Tích hợp full: telemetry qua VPN, 3 chế độ degradation (full/position-only/local), link-loss test → **M4 done** | AC6 (bay thật nếu được, nếu không sim+bench); AC8: 10 phút live ổn định; cắt link → local ≤5s không crash |
 | **W9** | 14/12–20/12 | Field test 1 với UAV được cấp (5 kịch bản, ghi log + video) | Log: 5/5 kịch bản chạy, issue list đã triage (critical/minor) |
 | **W10** | 21/12–27/12 | Stress: VRAM 4GB, link loss, latency + fix | AC9: <3.8GB/30s, OOM → `--cpu` khởi động lại OK; 5 vòng cắt/ghép link ≤5s |
@@ -70,7 +70,7 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 
 | # | Điểm mù | Impact | Khi nào hết mù | Cách giải quyết |
 |---|---------|--------|----------------|-----------------|
-| B1 | **Downlink video UAV** (FPV 5.8G / WiFi RTSP / USB?) | Định hình variant video W6 (A: RTSP / B: UVC); W5–W4 không phụ thuộc | **Ngày UAV về (chưa rõ) + 1 tuần** | Mở hộp, đọc spec, test kết nối 10 phút; ghi kết quả vào đây; tới trước W9 (field test) |
+| B1 | **Downlink video UAV** (FPV 5.8G / WiFi RTSP / USB?) + **alt + FOV** (input tam giác phân GPS) | Định hình variant video W6 (A: RTSP / B: UVC); geolocation W7 (nominal h=30m, FOV 60° tới đó); W5–W4 không phụ thuộc | **Ngày UAV về (chưa rõ) + 1 tuần** | Mở hộp, đọc spec, test kết nối 10 phút; **đo FOV (bay 30m, đánh dấu 2 điểm cách 10m, đếm pixel) + verify alt**; ghi kết quả vào đây; tới trước W9 (field test) |
 | B2 | **MAVLink/GCS** của UAV | W7: upload waypoint tự động (variant A) vs bay tay theo route gợi ý (variant B — build trước) | **Ngày UAV về (chưa rõ) + 1 tuần** | Cắm radio telemetry + QGroundControl |
 | B3 | **Vị trí UAV** (GPS onboard / MAVLink?) | Không có → demo dùng vị trí mô phỏng, AC6 đạt qua sim | **Ngày UAV về (chưa rõ) + 1 tuần** | Kiểm tra link telemetry / GPS onboard |
 | B4 | Node ESP32+NEO-6M trong BOM **chưa mua** (`hardware-bom.md` ghi "chưa mua") | Không có node GPS vật lý → demo dùng `--soldier-gps` + đồng đội mô phỏng | W1 | Đếm kho; nếu không có → dùng đường sim (code đã hỗ trợ) |
@@ -121,6 +121,7 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 3. Có sẵn **SIM 4G/data** nào không? → nếu không: chỉ WiFi riêng (demo trong vùng phủ AP).
 4. Module rung (haptic) có được cấp thêm sau này không? → giữ blocked; AC4 fallback flash + SLM.
 5. **Nguồn ảnh class `soldier`** (B9) — dataset mở hay tự ghi footage thao trường? → research W3, chốt trước train W4.
+6. UAV được cấp có gửi **độ cao (alt)** không? → input tam giác phân GPS (W7) — verify cùng B1 khi nhận máy.
 
 ## Validation Log
 
@@ -180,3 +181,18 @@ câu SLM đã có khoảng cách + hướng (SYSTEM_PROMPT example).
 **Impact:** PDR (S1/S4/S5, bảng dataset 8 class, AC3/AC6/AC7, §7, rủi ro VisDrone) ·
 plan.md (W3/W4/W7, KPI) · phase-02 (VisDrone + tham số thu) · phase-04 (follow + FOV
 indicator) · supervisor-briefing (mục trả lời feedback).
+
+### Session 3 — 2026-10-16 (hình học bay vòng + model khoảng cách)
+
+**Câu hỏi (user):** UAV bay vòng quanh lính (không trên đầu) thì tính khoảng cách
+target→lính thế nào? (User nhớ code đang ánh xạ qua độ cao + góc chúi + pixel.)
+**Verify:** `heretic_phase4_hud.py:29,41-57` — code hiện tại là model pixel-scale phẳng
+(`PIXEL_TO_METER = 0.05`, tâm ảnh = lính), **không có** alt/tilt → đúng chỉ khi UAV
+thẳng trên đầu; bay vòng → sai có hệ thống.
+**Decisions (user chốt):** tam giác phân GPS (GPS UAV + alt + góc chúi + FOV + pixel →
+lat/lon target → 2D tới lính, ±10–15%) đặt **Phase 4 (W7)**; Phase 1 không đổi (gater
+model-agnostic, vẫn nhận `distance_m`); bay vòng (bán kính 60–80m) + follow tách tầm
+phát hiện (xuyến 30–40m trên 360P) khỏi tầm đo (GPS) → ngưỡng 100m giữ nguyên.
+**Impact:** phase-04 (tactical_geolocation.py, `alt` payload, đo FOV/alt → B1, success
+criteria +1, risk +1) · PDR (header, S1, Scope OUT, AC2, §7 step 5, rủi ro, open Q6) ·
+plan.md (W7, B1, open Q6) · supervisor-briefing (header, §3 Q&A mới, §4 điểm trung thực).

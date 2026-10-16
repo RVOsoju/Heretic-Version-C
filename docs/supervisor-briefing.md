@@ -1,7 +1,8 @@
 # Heretic Version C — Báo Cáo Trình Bày Cho Giảng Viên Hướng Dẫn
 
 **Ngày:** 2026-10-12 · **Cập nhật:** 2026-10-16 (feedback giảng viên: dataset góc UAV + UAV theo dõi
-mục tiêu + FOV indicator — mục §3) · 2026-10-15 (quyết định: không tài trợ → dùng thiết bị có sẵn;
+mục tiêu + FOV indicator + **khoảng cách target→lính = tam giác phân GPS** — UAV bay vòng quanh
+lính, không bay trên đầu — mục §3) · 2026-10-15 (quyết định: không tài trợ → dùng thiết bị có sẵn;
 LoRa → mạng riêng WiFi/4G + WireGuard; haptic blocked → flash HUD; 8 class chốt mới; plan 12 tuần)
 **Thời lượng dự kiến:** 10–15 phút
 **Tài liệu chi tiết đi kèm:** `project-overview-pdr.md` (scope + tiêu chuẩn nghiệm thu) ·
@@ -73,6 +74,14 @@ follow** — sim: UAV bay tới vị trí ước tính target; real: MAVLink GOT
 hoặc HUD chỉ hướng + khoảng cách cho phi công bay theo.
 **Vòng demo = đúng yêu cầu: bay trên đầu → đi cùng theo → đo khoảng cách (m) + hướng → cảnh báo.**
 
+**Hỏi: UAV bay vòng (không trên đầu lính) thì tính khoảng cách target→lính thế nào?** —
+*Tối ưu (W7):* code hiện tại chỉ đúng khi UAV bay **thẳng trên đầu** (scale pixel phẳng);
+UAV bay vòng → chuyển **tam giác phân GPS**: GPS UAV + **độ cao (alt)** + góc chúi camera
++ FOV + vị trí pixel target → **lat/lon target trên mặt đất** → khoảng cách + hướng tới
+lính (cả hai có GPS). Sai số **±10–15%** (thay ±30–50% của scale pixel). Bay vòng
+**tách 2 phạm vi**: tầm phát hiện (xuyến camera→target, 360P chỉ ~30–40m) với tầm đo
+(GPS, không giới hạn) → ngưỡng 100m vẫn đạt: vòng bán kính 60–80m + follow mode.
+
 ## 4. Đã hoàn thành (có bằng chứng)
 
 | Thành phần | Trạng thái | Bằng chứng |
@@ -83,7 +92,8 @@ hoặc HUD chỉ hướng + khoảng cách cho phi công bay theo.
 | Chuỗi telemetry UAV: GPS → UDP 1Hz → HUD | **11/11 kiểm thử PASS** (kèm ảnh minh chứng) | `test_telemetry_chain.py` |
 | Tối ưu cho laptop 4GB VRAM (chạy thật, không phải server) | Dual-mode GPU/CPU (`--cpu`), warmup SLM, guide cài đặt Windows 11 | `laptop-deployment-guide.md` |
 
-**Điểm trung thực (không che):** khoảng cách là ước tính scale pixel (±30–50%),
+**Điểm trung thực (không che):** khoảng cách hiện là ước tính scale pixel (±30–50%) — từ W7
+sang tam giác phân GPS (±10–15%),
 chưa có track ID, chưa hoạt động ban đêm, link đang UDP/WiFi (chưa có VPN),
 cảnh báo im lặng chưa có module rung — đây chính là các mục Phase 5.
 

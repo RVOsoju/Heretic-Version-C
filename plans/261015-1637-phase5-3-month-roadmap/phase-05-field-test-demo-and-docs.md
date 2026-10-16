@@ -72,8 +72,8 @@ Field test checklist: `docs/field-test-checklist.md` (mới) — 5 kịch bản,
 8. **W11d3** — **chạy demo chính thức 1 lượt, ghi hình full 10 phút** — **AC11**.
 9. **W11d4** — re-verify AC1–AC11 lần cuối bằng bảng lệnh (mỗi AC 1 lệnh), ghi số đo thực.
 10. **W12d1–3** — tài liệu: cập nhật 3 file `docs/` (bước Modify); viết báo cáo đồ án
-    (sơ đồ hệ thống, kết quả AC1–AC11, giới hạn công khai: khoảng cách ±30–50%, SLM ~1s,
-    không ban đêm, haptic blocked).
+    (sơ đồ hệ thống, kết quả AC1–AC11, giới hạn công khai: khoảng cách tam giác phân GPS
+    ±10–15% (scale pixel ±30–50% chỉ tới W7), SLM ~1s, không ban đêm, haptic blocked).
 11. **W12d4–5** — buffer cho W9–W11 tràn.
 
 ## Success Criteria
