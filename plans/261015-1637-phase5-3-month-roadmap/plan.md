@@ -23,14 +23,15 @@ Mỗi tuần có 1 deliverable đo được; mọi điểm mù được ghi nh�
 Nguồn scope: `docs/project-overview-pdr.md` (S1–S7, AC1–AC11).
 
 **Giới hạn cứng (quyết định 2026-10-15):** không LoRa, không E88 Pro, không haptic (AC4 fallback = flash HUD + SLM),
-không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ nguyên.
+không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ nguyên
+(+ trường `alt` optional từ W7 cho tam giác phân GPS — feed không đổi).
 
 ## 12-week roadmap
 
 | Tuần | Ngày | Deliverable | Verify |
 |------|------|-------------|--------|
-| **W1** | 19/10–25/10 | Bật ByteTrack (`track=True, bytetrack.yaml` trên yolo26n); test 360P bằng video **tổng hợp** (downscale 720p → 640×360) — **UAV chưa rõ ngày về, W1 thuần code** | `model.track()` trả `boxes.id` ổn định trên clip 30s; log precision 360P (B6 bước 1) |
-| **W2** | 26/10–01/11 | Velocity + approach speed; **object-height anchor** (scale tự hiệu chuẩn theo chiều cao box — thay constant 0.05 sai ×1.5–3 ở 30–50m); gater re-key theo `track_id`; `test_tracking.py` → **M1 done** | AC1: re-ID <5%/100 khung · AC2: sai vận tốc <10% (scale anchor, distance sim 30m sai <25%) · AC3: cắt ngưỡng 100m 1 lần → báo đúng 1 lần |
+| **W1** | 19/10–25/10 | **Baseline test suite đầu tuần** (11/11 `test_telemetry_chain.py` + `--sim` 16 khung); bật ByteTrack (`track=True, bytetrack.yaml` trên yolo26n); test 360P bằng video **tổng hợp** (downscale 720p → 640×360) — **UAV chưa rõ ngày về, W1 thuần code** | `model.track()` trả `boxes.id` ổn định trên clip 30s; log precision 360P (B6 bước 1) |
+| **W2** | 26/10–01/11 | Velocity + approach speed; **object-height anchor** (scale tự hiệu chuẩn theo chiều cao box — thay constant 0.05 sai ×1.5–3 ở 30–50m); **flash HUD <100ms không âm (AC4)**; gater re-key theo `track_id`; `test_tracking.py` → **M1 done** | AC1: re-ID <5%/100 khung · AC2: sai vận tốc <10% (scale anchor, distance sim 30m sai <25%) · AC3: cắt ngưỡng 100m 1 lần → báo đúng 1 lần · AC4: flash <100ms |
 | **W3** | 02/11–08/11 | Tải MVRSD (verify Baidu; fallback AMAD/InvictusRex) + **VisDrone** (góc drone: person + 4 xe); **verify tham số thu** (độ cao/tốc độ/FOV) từ dataset card; prep data, map 8 class; **research nguồn `soldier`** (B9 — ưu tiên footage UAV tự quay) | `mvrsd-8c.yaml` hợp lệ, 3000 ảnh trên server; VisDrone subset 5 class; **tham số thu UAV ghi vào report**; B9 có kết quả |
 | **W4** | 09/11–15/11 | Fine-tune yolo26n → 8 class (MVRSD + **VisDrone** + `soldier` + COCO regression) + regression check → **M2 done** | `yolo val` mAP50 ≥0.75 (val MVRSD+VisDrone); mAP 6 class COCO giảm ≤5 điểm; tham số thu UAV ghi báo cáo (AC7) |
 | **W5** | 16/11–22/11 | **Sim-first**: dựng bench 2 node (laptop + node 2) + WireGuard, `udp_position_sender.py` — không phụ thuộc UAV | `wg show` 2 peer active; ping <20ms; `test_vpn_link.py` PASS (AC5 phần bench) |
@@ -212,3 +213,26 @@ là model chính. Hướng tiếp cận W7: bearing = atan2(GPS target − GPS l
 không phụ thuộc camera) + "đang tiếp cận" = dR/dt < 0 từ velocity track.
 **Impact:** phase-01 (overview, requirements, architecture, W2d1 mới, success +1, risk +1) ·
 PDR (header, S1, Scope OUT, AC2, rủi ro) · plan.md (W2) · supervisor-briefing (§3, §4).
+
+### Session 5 — 2026-10-16 (review toàn bộ trước khi bắt đầu W1)
+
+**Scope:** plan.md + 5 phase files + PDR + briefing — consistency, AC coverage, ngày tuần,
+interface, điểm start W1.
+**Gap find + fix ngay:**
+1. **AC4 (flash <100ms) không có bước implement ở phase nào, code không có `flash`**
+   (grep verify) → đặt vào Phase 1 W2d2 (gater trigger → overlay ≤3 khung @30fps, không âm);
+   phase-01 (overview/req/arch/files/steps/success) + plan.md W2 cập nhật.
+2. `make_sim_frame` (`heretic_phase4_hud.py:108`) sinh khung theo constant 0.05 → không có
+   ground truth vật lý để test height anchor → W2d1 thêm sub-step: sinh khung theo
+   (h=30m, FOV 60°): `scale = 2h·tan(FOV/2)/360`, box người = 1.7/scale px.
+3. Payload UDP: plan.md ghi "giữ nguyên `{id,lat,lon,t}`" nhưng phase-04 thêm `alt` (W7)
+   → ghi rõ `alt` là trường **optional**, `TelemetryFeed` không đổi.
+4. W1 thêm **baseline test suite đầu tuần** (11/11 + `--sim`) trước khi sửa code.
+5. Briefing §6 M4: thiếu geolocation → bổ sung.
+**OK (không đổi):** 8 class list đồng bộ 5 file · AC1–AC11 đều có phase + tuần (AC4 đã fix) ·
+ngày W1–W12 khớp (W1 = T2 19/10) · dependencies P1–P5 đúng · B1–B9 có deadline ·
+`TelemetryFeed`/gater interface không đổi · 200-line rule: phase-04 tách `tactical_uav_fov.py`/
+`tactical_geolocation.py` sẵn.
+**Còn mở (fix dần — có deadline trong register):** B1–B3 (UAV về, trước W9) · B5 (Baidu, W3d1) ·
+B6 (360P, W1 + retest) · B7 (SIM 4G, W5) · B9 (ảnh soldier, W3d3) · alt/FOV thực (B1) ·
+`military_vehicle` height 3.0m (verify W4).

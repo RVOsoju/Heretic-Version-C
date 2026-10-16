@@ -120,7 +120,7 @@ không cần hạ tầng riêng.
 | M1 | W1–W2 | Tracking ByteTrack + gater theo track_id (AC1–AC3) |
 | M2 | W3–W4 | Fine-tune YOLO 8 class MVRSD, multi-GPU, pin version (AC7) — song song M1 |
 | M3 | W5–W6 | Mạng riêng WiFi/4G + WireGuard (bench 2 node) + camera 360P (AC5, nửa AC8) |
-| M4 | W7–W8 | Cone FOV + **follow target** + FOV indicator + tuần tra + tích hợp full 3 chế độ degradation (AC6, AC8) |
+| M4 | W7–W8 | Cone FOV + **follow target** + FOV indicator + **tam giác phân GPS** (khoảng cách ±10–15%) + tuần tra + tích hợp full 3 chế độ degradation (AC6, AC8) |
 | M5 | W9–W12 | Field test + stress + demo E2E 10 phút + tài liệu (AC9–AC11, W12 buffer) |
 
 **Ngân sách: 0 VND mua mới** — dùng laptop TUF F15 + server dev 4× RTX 5000 Ada +

@@ -14,7 +14,8 @@ dependencies: []
 W1–W2: bật ByteTrack trên yolo26n, tính vận tốc + tốc độ tiếp cận theo track, chuyển gater
 từ key `(target, bearing)` sang `track_id`; **object-height anchor** (W2) — tự hiệu chuẩn
 scale m/px theo chiều cao box (người = thước 1.7m) thay constant `PIXEL_TO_METER = 0.05`
-(sai ×1.5–3 ở độ cao bay 30–50m). W1 thuần code — **UAV được cấp chưa rõ ngày về**
+(sai ×1.5–3 ở độ cao bay 30–50m); **flash HUD cảnh báo im lặng** (W2, AC4 — code hiện
+chưa có flash). W1 thuần code — **UAV được cấp chưa rõ ngày về**
 (quyết định 2026-10-15), test 360P bằng video tổng hợp (downscale 720p → 640×360).
 Khi UAV về tay: phá 3 điểm mù (B1 downlink, B2 MAVLink, B3 GPS) + retest 360P frame thật (B6).
 M1 done = AC1–AC3.
@@ -30,6 +31,8 @@ M1 done = AC1–AC3.
   military_vehicle 3.0` (m). Fallback 0.05 khi class không có trong bảng hoặc `box_h < 8px`
   (quá xa, box không đủ tin). Không cần phần cứng mới; giảm nhẹ B1 (không phụ thuộc alt UAV).
 - Gater key theo `track_id`: mục tiêu cắt ngưỡng 100m một lần → cảnh báo đúng 1 lần, không lặp khi track dịch chuyển.
+- **Flash HUD (AC4, W2)**: gater trigger → flash toàn màn (đỏ/trắng, ≤3 khung @30fps =
+  <100ms), **không phát âm** (OPSEC). Haptic giữ blocked — bật lại khi có module rung.
 - 360P (W1): chạy model hiện tại trên 10 frame 640×360 tổng hợp, log precision (B6 bước 1).
 - Khi UAV về tay (chưa rõ ngày): xác định loại downlink video, hỗ trợ MAVLink/GCS, nguồn vị trí GPS (B1–B3); retest 360P frame thật (B6).
 
@@ -54,7 +57,7 @@ frame (720p/360P)
       → approach_mps = −d(dist_m)/dt
   → tactical dict: {target, track_id, distance_m, bearing, approach_mps, box, side}
   → TacticalAlertGater: key = track_id (fallback (target, bearing) khi không có track — chế độ --sim)
-  → SLM + HUD (không đổi)
+  → SLM + HUD; gater trigger → flash toàn màn ≤3 khung (<100ms, không âm — AC4)
 ```
 
 Khi UAV về tay (ngoài code, chưa rõ ngày — verify **trước W9**): mở hộp → đọc spec → test
@@ -70,6 +73,7 @@ Phase 3 (variant tuần tra Phase 4 build trước, không chờ).
 **Modify**
 - `heretic_phase4_hud.py` — `:204` gọi `model.track(...)` thay `model(...)`; `build_tactical_data` (`:60`) thêm `track_id`, `approach_mps`; `enemies_payload` (`:80`) truyền `track_id`; thêm flag `--model`; **object-height anchor**: bảng `CLASS_HEIGHT_M` + scale = `height / box_h_px` trong `calculate_tactical_telemetry` (`:41`, fallback 0.05).
 - `tactical_slm.py` — `TacticalAlertGater._key` (`:56-57`) + dict `last_warned` (`:53`): ưu tiên `track_id`, fallback key cũ.
+- `tactical_hud_renderer.py` — `render_hud` (`:129`): thêm `flash=False` → overlay toàn màn đỏ/trắng khi gater trigger (≤3 khung).
 - `test_telemetry_chain.py` — thêm kịch bản AC3: mục tiêu cắt ngưỡng 100m một lần → đúng 1 cảnh báo.
 
 **Delete** — không.
@@ -93,15 +97,21 @@ Phase 3 (variant tuần tra Phase 4 build trước, không chờ).
    (B3) — ghi kết quả vào `plan.md`.)*
 6. **W2d1** — object-height anchor: bảng `CLASS_HEIGHT_M` + `calculate_tactical_telemetry`
    (`heretic_phase4_hud.py:41`): `scale = CLASS_HEIGHT_M[cls] / box_h_px` (fallback 0.05 nếu
-   cls không có bảng hoặc `box_h < 8px`); verify nhanh: 1 frame 30m tổng hợp → distance sai
-   <25% so ground truth (trước khi có anchor: sai ×1.5–3).
-7. **W2d2–3** — tạo `test_tracking.py`: video tổng hợp numpy 150 khung 30fps, 1 người di chuyển
+   cls không có bảng hoặc `box_h < 8px`). **Cập nhật `make_sim_frame`** (`:108`): sinh khung
+   nhất quán vật lý theo (h, FOV) — `scale = 2h·tan(FOV/2)/360`, box người = 1.7/scale px,
+   vị trí = distance/scale px từ tâm (h=30m, FOV 60°) — để anchor có ground truth thật.
+   Verify: frame 30m tổng hợp → distance sai <25% (trước anchor: sai ×1.5–3).
+7. **W2d2** — **flash HUD (AC4)**: `tactical_hud_renderer.py:129` `render_hud` thêm
+   `flash=False` → overlay toàn màn đỏ/trắng; `heretic_phase4_hud.py` set flash khi gater
+   trigger, giữ ≤3 khung (30fps → <100ms), không phát âm. Verify: log timestamp trigger →
+   start/end flash <100ms.
+8. **W2d3–4** — tạo `test_tracking.py`: video tổng hợp numpy 150 khung 30fps, 1 người di chuyển
    thẳng tốc độ biết trước → chạy `model.track` → (a) đếm lần đổi ID / tổng khung (re-ID rate),
    (b) so `velocity` tính được với ground truth (scale height anchor). In PASS/FAIL + số đo.
-8. **W2d4** — `test_telemetry_chain.py`: thêm case AC3 — payload mục tiêu đi 105m → 95m
-   (cắt ngưỡng 100m một lần, giữ track_id) → assert `evaluate_alert` trả cảnh báo đúng 1 lần.
-9. **W2d5** — chạy full suite: `test_tracking.py`, `test_telemetry_chain.py`,
-   `heretic_phase4_hud.py --sim` (16 khung) → sign-off M1.
+9. **W2d5** — `test_telemetry_chain.py`: thêm case AC3 — payload mục tiêu đi 105m → 95m
+   (cắt ngưỡng 100m một lần, giữ track_id) → assert `evaluate_alert` trả cảnh báo đúng 1 lần;
+   chạy full suite: `test_tracking.py`, `test_telemetry_chain.py`, `heretic_phase4_hud.py --sim`
+   (16 khung) → sign-off M1.
 
 ## Success Criteria
 
@@ -110,6 +120,7 @@ Phase 3 (variant tuần tra Phase 4 build trước, không chờ).
 - [ ] Object-height anchor: distance trên sim tổng hợp (độ cao 30m) sai <25% so ground truth
       (trước anchor: sai ×1.5–3 do constant 0.05) — nuôi AC2/AC3
 - [ ] `python test_telemetry_chain.py` PASS: mục tiêu cắt ngưỡng 100m một lần → đúng 1 cảnh báo, không lặp — **AC3**
+- [ ] Flash HUD: gater trigger → flash <100ms (≤3 khung @30fps), không phát âm — **AC4**
 - [ ] `python heretic_phase4_hud.py --sim` chạy xong 16 khung, cảnh báo đúng nhịp (không regression)
 - [ ] 360P step 1: precision 10 frame 640×360 tổng hợp đã log vào B6 (W1)
 - [ ] Khi UAV về tay (trước W9): downlink type + MAVLink + GPS xác định, 360P frame thật retest (B1–B3, B6 đóng)
