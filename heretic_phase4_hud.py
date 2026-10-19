@@ -23,6 +23,7 @@ import numpy as np
 from tactical_hud_renderer import WARN_RANGE_M, render_hud
 from tactical_slm import TacticalAlertGater, call_ollama, evaluate_alert
 from tactical_telemetry_feed import TelemetryFeed, is_friendly_by_gps, read_soldier_gps
+from tactical_tracker import TrackStore
 
 FRAME_WIDTH = 1280
 FRAME_HEIGHT = 720
@@ -57,32 +58,41 @@ def calculate_tactical_telemetry(box, center_x, center_y, scale):
     return distance, direction
 
 
-def build_tactical_data(results, center_x, center_y, scale, model_names, friendly_fn=None):
-    """List box YOLO -> list {target, distance_m, bearing, box, side} cho renderer.
-    friendly_fn: ham nhan biet dong doi (None -> het thuc la dich)."""
+def build_tactical_data(results, center_x, center_y, scale, model_names, friendly_fn=None,
+                        tracker=None, ts=None):
+    """List box YOLO -> list {target, track_id, distance_m, bearing, approach_mps, box, side}.
+    friendly_fn: ham nhan biet dong doi (None -> het thuc la dich).
+    tracker+ts: TrackStore (Phase 1) — neu co, mo tung track + tinh approach_mps."""
     tactical = []
     for r in results:
         for box in r.boxes:
             class_name = model_names[int(box.cls[0])]
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
             distance, direction = calculate_tactical_telemetry(box, center_x, center_y, scale)
+            track_id = int(box.id[0]) if box.id is not None else None
             t = {
                 "target": class_name,
+                "track_id": track_id,
                 "distance_m": distance,
                 "bearing": direction,
                 "box": (x1, y1, x2, y2),
             }
+            if tracker is not None and track_id is not None and ts is not None:
+                tracker.update(track_id, ts, (x1 + x2) / 2, (y1 + y2) / 2, distance, scale)
+                t["approach_mps"] = round(tracker.approach(track_id), 2)
             t["side"] = "friendly" if friendly_fn and friendly_fn(t) else "enemy"
             tactical.append(t)
     return tactical
 
 
 def enemies_payload(tactical):
-    """Payload SLM tu cac unit DIC duy nhat (dong doi khong duoc bat canh bao)."""
+    """Payload SLM tu cac unit DIC duy nhat (dong doi khong duoc bat canh bao).
+    Mang theo track_id + approach_mps de gater ngat ngan theo track, khong lap."""
     return {"soldier_gps": SOLDIER_GPS,
             "detected_threats": [
                 {"target": t["target"], "distance_m": t["distance_m"],
-                 "bearing": t["bearing"]}
+                 "bearing": t["bearing"], "track_id": t.get("track_id"),
+                 "approach_mps": t.get("approach_mps")}
                 for t in tactical if t.get("side", "enemy") == "enemy"]}
 
 
@@ -135,6 +145,8 @@ def main():
                         help="Doc NEO-6M cua lich qua USB TTL, vi du: /dev/ttyUSB0 (Windows: COM5)")
     parser.add_argument("--cpu", action="store_true",
                         help="Chay YOLO tren CPU - de nguyen VRAM cho SLM (laptop 4GB VRAM)")
+    parser.add_argument("--slm", action="store_true",
+                        help="Bat SLM Ollama cho cau canh bao (mac dinh: template, khong can Ollama)")
     args = parser.parse_args()
 
     # Toa do lich: --gps-port (phan cuong) > --soldier-gps (thua tay) > muc dinh
@@ -157,6 +169,7 @@ def main():
     friendly_fn = (lambda t: is_friendly_by_gps(t, feed, soldier_latlon)) if feed else None
 
     gater = TacticalAlertGater()
+    tracker = TrackStore()
 
     if args.sim:
         sim_box = None
@@ -167,7 +180,7 @@ def main():
                  "bearing": "Tây", "box": sim_box}
             t["side"] = "friendly" if friendly_fn and friendly_fn(t) else "enemy"
             tactical = [t]
-            alert = evaluate_alert(enemies_payload(tactical), gater)
+            alert = evaluate_alert(enemies_payload(tactical), gater, use_slm=args.slm)
             uav_frac, gps_units = minimap_units_from_feed(feed, soldier_latlon)
             out = render_hud(frame, tactical, alert, time.time(), uav_frac, gps_units)
             tag = "alert" if alert else "quiet"
@@ -183,12 +196,13 @@ def main():
     from ultralytics import YOLO
     model = YOLO("yolo26n.pt")
 
-    # Warmup SLM: tai mo hinh len GPU truoc, tranh dong 4-5s o canh bao dau tien
-    try:
-        call_ollama("Tra ve dung 1 tu: An toan", timeout=120)
-        print("[INFO] SLM da nong, san sang canh bao.")
-    except Exception as exc:
-        print(f"[CANH CAO] SLM chua san sang (Ollama chua chay?): {exc}")
+    # Warmup SLM chi khi --slm (mac dinh: template 0ms, khong can Ollama)
+    if args.slm:
+        try:
+            call_ollama("Tra ve dung 1 tu: An toan", timeout=120)
+            print("[INFO] SLM da nong, san sang canh bao.")
+        except Exception as exc:
+            print(f"[CANH CAO] SLM chua san sang (Ollama chua chay?) — de duoc cai template: {exc}")
 
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
@@ -201,10 +215,12 @@ def main():
         success, frame = cap.read()
         if not success:
             break
-        results = model(frame, stream=False, verbose=False, device=yolo_device)
+        results = model.track(frame, persist=True, tracker="bytetrack.yaml",
+                              stream=False, verbose=False, device=yolo_device)
         tactical = build_tactical_data(results, cx, cy, PIXEL_TO_METER, model.names,
-                                       friendly_fn)
-        alert = evaluate_alert(enemies_payload(tactical), gater)
+                                       friendly_fn, tracker=tracker, ts=time.time())
+        tracker.prune()
+        alert = evaluate_alert(enemies_payload(tactical), gater, use_slm=args.slm)
         uav_frac, gps_units = minimap_units_from_feed(feed, soldier_latlon)
         cv2.imshow("Heretic Tactical HUD - Phase 4",
                    render_hud(frame, tactical, alert, time.time(), uav_frac, gps_units))

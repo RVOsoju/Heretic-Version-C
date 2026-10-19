@@ -15,6 +15,7 @@ import cv2
 
 from heretic_phase4_hud import enemies_payload, make_sim_frame, minimap_units_from_feed
 from tactical_hud_renderer import render_hud
+from tactical_slm import TacticalAlertGater, evaluate_alert, template_alert
 from tactical_telemetry_feed import (EARTH_M_PER_DEG_LAT, TelemetryFeed,
                                      is_friendly_by_gps)
 
@@ -83,6 +84,20 @@ def main():
     path = "test_telemetry_chain_out.png"
     cv2.imwrite(path, render_hud(frame, [t], None, time.time(), uav_frac, gps_units))
     print(f"  [INFO] Anh kieu thuc -> {path}")
+
+    # Kenh cau canh bao: template (mac dinh, khong Ollama) + gater ngat ngan
+    check("template cau hinh dung",
+          template_alert({"target": "person", "distance_m": 95, "bearing": "Đông"})
+          == "CẢNH BÁO: Kẻ địch cách 95m hướng Đông!")
+    g = TacticalAlertGater()
+    payload = {"soldier_gps": {"lat": 21.0333, "lon": 105.7333},
+               "detected_threats": [{"target": "person", "distance_m": 95.0,
+                                     "bearing": "Tây", "track_id": 42}]}
+    a1 = evaluate_alert(payload, g)
+    check("template 95m lan 1 -> co canh bao",
+          a1 is not None and a1.startswith("CẢNH BÁO:"))
+    a2 = evaluate_alert(payload, g)
+    check("template 95m lan 2 (chua giam 10m) -> im lang", a2 is None)
 
     tx.close()
     feed.stop()

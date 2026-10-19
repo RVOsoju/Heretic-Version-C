@@ -1,9 +1,11 @@
 # Heretic Version C — Báo Cáo Trình Bày Cho Giảng Viên Hướng Dẫn
 
-**Ngày:** 2026-10-12 · **Cập nhật:** 2026-10-16 (feedback giảng viên: dataset góc UAV + UAV theo dõi
-mục tiêu + FOV indicator + **khoảng cách target→lính = tam giác phân GPS** — UAV bay vòng quanh
-lính, không bay trên đầu — mục §3) · 2026-10-15 (quyết định: không tài trợ → dùng thiết bị có sẵn;
-LoRa → mạng riêng WiFi/4G + WireGuard; haptic blocked → flash HUD; 8 class chốt mới; plan 12 tuần)
+**Ngày:** 2026-10-12 · **Cập nhật:** 2026-10-19 (kênh câu chữ: **template là chính** (0ms, 0 VRAM)
++ **SLM optional** `--slm` — không phụ thuộc Ollama, giải phóng ~2GB VRAM) · 2026-10-16 (feedback
+giảng viên: dataset góc UAV + UAV theo dõi mục tiêu + FOV indicator + **khoảng cách target→lính
+= tam giác phân GPS** — UAV bay vòng quanh lính, không bay trên đầu — mục §3) · 2026-10-15
+(quyết định: không tài trợ → dùng thiết bị có sẵn; LoRa → mạng riêng WiFi/4G + WireGuard;
+haptic blocked → flash HUD; 8 class chốt mới; plan 12 tuần)
 **Thời lượng dự kiến:** 10–15 phút
 **Tài liệu chi tiết đi kèm:** `project-overview-pdr.md` (scope + tiêu chuẩn nghiệm thu) ·
 `plans/261015-1637-phase5-3-month-roadmap/plan.md` (plan 12 tuần, register điểm mù B1–B9)
@@ -16,7 +18,7 @@ Heretic C là **hệ thống HUD chiến thuật phi sát thương** cho lính: 
 từ UAV (360P+) → phát hiện + theo dõi mục tiêu (YOLO 8 class) → phân biệt địch/đồng đội
 qua GPS → cảnh báo qua 3 kênh: **hình** (bounding box + minimap), **im lặng**
 (FLASH HUD <100ms — OPSEC, không lộ vị trí; haptic rung khi có phần cứng),
-và **câu chữ AI** (SLM tiếng Việt, cho màn chỉ huy). Chạy thời gian thực trên laptop cá nhân
+và **câu chữ** (template 0ms là chính; SLM tiếng Việt optional qua `--slm` — cho màn chỉ huy). Chạy thời gian thực trên laptop cá nhân
 (RTX 3050 4GB), liên kết UAV qua **mạng riêng WiFi/4G + WireGuard VPN**
 — không phụ thuộc hạ tầng dân dụng. Kịch bản: **1 lính + 1 UAV được cấp** —
 UAV bay quanh vị trí người được bảo vệ và **bay theo mục tiêu phát hiện**.
@@ -89,7 +91,7 @@ bearing = la bàn thật từ 2 GPS, không phụ thuộc hướng camera. Bay v
 | Thành phần | Trạng thái | Bằng chứng |
 |------------|-----------|------------|
 | Pipeline YOLO26n → gater 100/10/1m → SLM → HUD | Chạy được, 6 class COCO | `heretic_phase4_hud.py`, chế độ `--sim` xuất 16 khung ảnh |
-| SLM qwen2.5:3b (Ollama) cảnh báo tiếng Việt ≤12 từ | Latency đã đo: floor ~0,4s (server), ước 0,8–1,5s (laptop) | `tactical_slm.py --demo` |
+| Kênh câu chữ: template (chính, 0ms) + SLM qwen2.5:3b optional (`--slm`) | SLM latency đã đo: floor ~0,4s (server), ước 0,8–1,5s (laptop); template = 0ms, không cần Ollama | `tactical_slm.py --demo` (template) / `--demo --slm` |
 | HUD quân dụng: bbox + minimap + địch/đồng đội theo GPS (bán kính 8m) | Hoàn thành | `tactical_hud_renderer.py` |
 | Chuỗi telemetry UAV: GPS → UDP 1Hz → HUD | **11/11 kiểm thử PASS** (kèm ảnh minh chứng) | `test_telemetry_chain.py` |
 | Tối ưu cho laptop 4GB VRAM (chạy thật, không phải server) | Dual-mode GPU/CPU (`--cpu`), warmup SLM, guide cài đặt Windows 11 | `laptop-deployment-guide.md` |
@@ -108,7 +110,8 @@ cảnh báo im lặng chưa có module rung — đây chính là các mục Phas
    dữ liệu cũ >5s bị vô hiệu (cơ chế `STALE_AFTER_S` đã có trong code).
 4. **Mô hình dữ liệu thống nhất: Track** `{id, pos, vel, class, side, confidence, ttl}`
    → thay transport UDP → VPN không đụng giao diện `TelemetryFeed` (1 dòng không đổi).
-5. **AI text chỉ advisory** — SLM (0,4–1,5s) cho màn chỉ huy, **không** nằm trong vòng lặp <100ms.
+5. **Kênh câu chữ không nằm trong vòng lặp thời gian thực** — template 0ms (mặc định, luôn
+   hoạt động); SLM (0,4–1,5s) optional cho màn chỉ huy, **không** nằm trong vòng lặp <100ms.
 
 Lưu lượng hệ thống rất nhỏ (~30 byte/s/node) → mạng riêng WiFi/4G + WireGuard **đủ**,
 không cần hạ tầng riêng.

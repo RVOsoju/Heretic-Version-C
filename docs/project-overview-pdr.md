@@ -1,7 +1,7 @@
 # PDR — Heretic Version C: Target, Scope & Acceptance Criteria
 
-**Dự án:** HUD chiến thuật cho lính — YOLO + SLM Ollama (tiếng Việt) + HUD + telemetry UAV
-**Ngày:** 2026-10-07 · **Cập nhật:** 2026-10-16 (feedback giảng viên: **dataset góc UAV** + **UAV theo dõi mục tiêu** + **FOV indicator** + **khoảng cách target→lính = tam giác phân GPS** (W7) + **object-height anchor** (W2) — UAV bay vòng quanh lính, không bay trên đầu; 2026-10-15: không tài trợ, mạng riêng WiFi/4G+VPN, UAV được cấp 360P+ — **chưa rõ ngày về**, 8 class chốt: person/soldier + 5 xe thường + military_vehicle)
+**Dự án:** HUD chiến thuật cho lính — YOLO + cảnh báo tiếng Việt (template + SLM Ollama optional) + HUD + telemetry UAV
+**Ngày:** 2026-10-07 · **Cập nhật:** 2026-10-19 (kênh câu chữ: **template là chính** (0ms, 0 VRAM) + **SLM optional** `--slm` — giải phóng ~2GB VRAM, không phụ thuộc Ollama) · 2026-10-16 (feedback giảng viên: **dataset góc UAV** + **UAV theo dõi mục tiêu** + **FOV indicator** + **khoảng cách target→lính = tam giác phân GPS** (W7) + **object-height anchor** (W2) — UAV bay vòng quanh lính, không bay trên đầu; 2026-10-15: không tài trợ, mạng riêng WiFi/4G+VPN, UAV được cấp 360P+ — **chưa rõ ngày về**, 8 class chốt: person/soldier + 5 xe thường + military_vehicle)
 **Runtime target:** Asus TUF F15 FX507 — RTX 3050 (4GB VRAM), i7-12700H, 16GB DDR4, **Windows 11**
 **Kịch bản:** 1 lính + 1 UAV. Phi sát thương — chỉ phát hiện + cảnh báo, không vũ khí tự động.
 
@@ -17,7 +17,7 @@ Heretic C là **hệ thống cảnh báo chiến thuật demo/đồ án đạt 7
 từ video trinh sát (UAV 360P+/webcam), hệ thống phát hiện + theo dõi mục tiêu, phân biệt
 địch/đồng đội qua GPS, và cảnh báo lính qua 3 kênh — hình (box + minimap),
 **im lặng** (haptic rung khi có phần cứng — OPSEC: không lộ vị trí),
-và **câu chữ SLM** (màn C2) — chạy thời gian thực trên laptop cá nhân,
+và **câu chữ** (template 0ms; SLM optional — màn C2) — chạy thời gian thực trên laptop cá nhân,
 liên kết UAV qua **mạng riêng WiFi/4G + VPN** (không phụ thuộc hạ tầng dân dụng).
 
 ## 2. Definition of done
@@ -35,13 +35,13 @@ chưa chạy được đủ AC1–AC11 (AC4 = chế độ fallback hình ảnh c
 
 | # | Mục | Chi tiết | AC |
 |---|-----|----------|----|
-| S1 | **Tracking (ByteTrack)** | Real-time; track_id ổn định; tính **vận tốc + tốc độ tiếp cận**; gater chuyển key từ `(target, bearing)` sang `track_id`; **nhiều target → cảnh báo target gần nhất** (câu SLM + HUD có khoảng cách m + hướng từ lính); **khoảng cách target→lính**: W2 **object-height anchor** (scale = kích thước thật class / chiều cao box, ±15–25%, không cần alt UAV) → W7 **tam giác phân GPS** (GPS UAV + alt + góc chúi + FOV + pixel → lat/lon target → 2D tới lính, ±10–15%) — model pixel-scale cố định 0.05 chỉ đúng ở độ cao ~15–22m (sai ×1.5–3 ở 30–50m) | AC1–AC3 |
+| S1 | **Tracking (ByteTrack)** | Real-time; track_id ổn định; tính **vận tốc + tốc độ tiếp cận**; gater chuyển key từ `(target, bearing)` sang `track_id`; **nhiều target → cảnh báo target gần nhất** (câu cảnh báo + HUD có khoảng cách m + hướng từ lính); **khoảng cách target→lính**: W2 **object-height anchor** (scale = kích thước thật class / chiều cao box, ±15–25%, không cần alt UAV) → W7 **tam giác phân GPS** (GPS UAV + alt + góc chúi + FOV + pixel → lat/lon target → 2D tới lính, ±10–15%) — model pixel-scale cố định 0.05 chỉ đúng ở độ cao ~15–22m (sai ×1.5–3 ở 30–50m) | AC1–AC3 |
 | S2 | **Kênh cảnh báo im lặng** | **Hiện tại: HUD flash + SLM (chưa có module rung).** Haptic (Arduino + motor) giữ làm mục blocked — bật lại khi có phần cứng, AC4 fallback = flash hình <100ms | AC4 |
 | S3 | **Mạng riêng WiFi/4G + VPN (WireGuard)** | **Thay LoRa** (quyết định 2026-10-15). UDP transport giữ nguyên, thêm lớp VPN; **interface `TelemetryFeed` không đổi**; link đứt → chế độ cục bộ TTL 5s (đã có `STALE_AFTER_S`) | AC5 |
 | S4 | **UAV tuần tra + FOV + theo dõi** | Flycam bay theo lộ trình quanh vị trí người được bảo vệ (MAVLink nếu UAV hỗ trợ, nếu không = bay tay theo route gợi ý); laptop vẽ **vùng phủ camera** (cone) lên minimap; **chế độ follow: UAV bay theo vị trí mục tiêu** (sim: theo track; real: MAVLink GOTO / HUD chỉ hướng cho phi công); **indicator target trong/ngoài tầm nhìn UAV**; mode sim khi chưa bay thật | AC6 |
 | S5 | **YOLO 8 class (góc UAV)** | 8 class (chốt 2026-10-15): `person, soldier, car, motorcycle, truck, bus, boat, military_vehicle` — **gộp tất cả xe quân sự thành 1 class** (không phân tank/IFV/pháo), **loại máy bay**, **phân biệt người thường/lính**. Dataset **đặc thù UAV** (yêu cầu giảng viên 2026-10-16): MVRSD (góc drone/satellite, gộp label) + **VisDrone** (ảnh drone: person + 4 xe) + footage UAV thật tự quay (khi UAV về — gold standard, đồng thời là nguồn `soldier` B9); **tham số thu (độ cao, tốc độ, FOV) ghi vào báo cáo**; server multi-GPU; **pin version ultralytics server=laptop** | AC7 |
 | S6 | **Demo UAV được cấp (camera 360P+)** | Video source abstraction (webcam / RTSP / UVC / file); hiệu chỉnh YOLO cho input 360P; chạy demo end-to-end bằng UAV thật | AC8 |
-| S7 | **Kênh SLM (giữ nguyên)** | qwen2.5:3b Ollama, cảnh báo tiếng Việt ≤12 từ, advisory chỉ cho C2 — **không** vào vòng lặp thời gian thực | AC10 |
+| S7 | **Kênh câu chữ (template + SLM optional)** | template f-string = **chính** (0ms, 0 VRAM, luôn hoạt động); SLM qwen2.5:3b Ollama = optional qua `--slm` (cảnh báo tiếng Việt ≤12 từ, advisory chỉ cho C2) — **không** vào vòng lặp thời gian thực | AC10 |
 
 **Dataset 8 class — trả lời "bao nhiêu đối tượng, cụ thể gì" (yêu cầu giảng viên 2026-10-16):**
 
@@ -59,7 +59,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 
 - **LoRa** — thay bằng WiFi/4G + VPN (quyết định 2026-10-15).
 - **E88 Pro** — không có ngân sách; dùng **UAV được cấp** thay thế.
-- **Haptic module** — blocked (chưa có phần cứng); cảnh báo im lặng hiện tại = flash hình + SLM.
+- **Haptic module** — blocked (chưa có phần cứng); cảnh báo im lặng hiện tại = flash hình + câu chữ.
 - Mesh đa lính / node RPi–Jetson / NPU trên UAV — **Tier C** (kiến trúc mesh-ready: model `Track`, `TelemetryFeed` là điểm hội tụ).
 - Triển khai thật: anti-jam, rugged, mật mã đầy đủ, nguồn điện >2h.
 - **Thermal ban đêm** — Phase 6, không tính trong done.
@@ -80,7 +80,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 | AC7 | YOLO 8 class (góc UAV) | `yolo val` trên val (MVRSD + VisDrone + soldier) + 1 clip demo có lính + xe quân sự | mAP50 ≥ 0,75; soldier + military_vehicle được box + SLM cảnh báo; **mAP 6 class COCO không giảm >5%**; weight chạy trên 3050 (cùng version ultralytics); **tham số thu (độ cao/tốc độ/FOV) ghi trong báo cáo** |
 | AC8 | UAV được cấp live | Video 360P+ từ UAV → HUD | ≥15fps; người trong khung → cảnh báo <2s |
 | AC9 | VRAM 4GB | `nvidia-smi -l 1` 30s đầu chạy full; cố tình OOM | <3,8GB ổn định; `--cpu` khởi động lại bình thường |
-| AC10 | SLM | Log `--sim` | <1,5s/call (warm); câu ≤12 từ, tiếng Việt |
+| AC10 | Câu cảnh báo | Log `--sim` | template: 0ms, luôn hoạt động (không phụ thuộc Ollama); SLM optional: <1,5s/call (warm), câu ≤12 từ, tiếng Việt |
 | AC11 | Demo end-to-end | Kịch bản demo 10 phút (§7) chạy một lượt | Không interrupt; đủ kênh cảnh báo |
 
 ## 6. Non-functional requirements
@@ -91,13 +91,13 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 | Windows 11 | Guide + code target (COMx cho USB TTL) |
 | Ollama native port 11434 | **Không** cần `OLLAMA_HOST` trên laptop |
 | YOLO fps | 20–40 GPU (720p) / 15+ (360P) / 8–15 CPU (`--cpu`) |
-| SLM latency | 0,8–1,5s/call — chấp nhận vì gater bắn cách quãng |
+| SLM latency (chỉ khi `--slm`) | 0,8–1,5s/call — chấp nhận vì gater bắn cách quãng; template = 0ms |
 | Nguồn điện | 30–60 phút pin laptop |
 | Degradation | 3 chế độ: đầy đủ / chỉ mạng vị trí / cục bộ — hệ không crash khi link đứt |
 
 ## 7. Kịch bản demo 10 phút (AC11)
 
-1. Bật Ollama + HUD (warmup SLM tự chạy).
+1. Bật HUD (câu cảnh báo = template mặc định; thêm `--slm` + bật Ollama nếu muốn câu SLM — warmup tự chạy).
 2. UAV bay (thật hoặc replay 360P) **theo route quanh vị trí người được bảo vệ** (GPS lính 1Hz là tâm minimap): người "địch" đi vào từ xa.
 3. HUD: box đỏ + mũi tên hướng + track id ổn định + cone FOV UAV + **badge "mục tiêu trong tầm nhìn"**.
 4. ~100m (ngưỡng cảnh báo): HUD flash + câu SLM trên màn C2:

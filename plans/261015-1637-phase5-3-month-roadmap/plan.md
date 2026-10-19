@@ -1,7 +1,7 @@
 ---
 title: "Heretic C Phase 5 - 3-month roadmap (no budget, WiFi/4G VPN, 360P UAV)"
 description: "Lộ trình 12 tuần cho đồ án Heretic C: tracking + YOLO 8 class + mạng riêng VPN + UAV 360P + demo E2E, ngân sách 0 đồng mua mới."
-status: pending
+status: in-progress
 priority: P1
 effort: "12w"
 branch: "main"
@@ -30,7 +30,7 @@ không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ 
 
 | Tuần | Ngày | Deliverable | Verify |
 |------|------|-------------|--------|
-| **W1** | 19/10–25/10 | **Baseline test suite đầu tuần** (11/11 `test_telemetry_chain.py` + `--sim` 16 khung); bật ByteTrack (`track=True, bytetrack.yaml` trên yolo26n); test 360P bằng video **tổng hợp** (downscale 720p → 640×360) — **UAV chưa rõ ngày về, W1 thuần code** | `model.track()` trả `boxes.id` ổn định trên clip 30s; log precision 360P (B6 bước 1) |
+| **W1 ✓** | 19/10–25/10 | **✓ DONE 19/10 (W1d1–d5):** baseline 11/11 + 16 khung; ByteTrack (`model.track`, bytetrack.yaml) + `TrackStore` (velocity/approach/prune) + gater re-key `track_id` (fallback cũ) + `test_360p_precision.py` (360P tổng hợp) | ✓ `boxes.id` ổn định 30 khung (0 re-ID), overhead **1.5ms <5ms**; precision 360P **P 0.74/R 0.79** → B6 |
 | **W2** | 26/10–01/11 | Velocity + approach speed; **object-height anchor** (scale tự hiệu chuẩn theo chiều cao box — thay constant 0.05 sai ×1.5–3 ở 30–50m); **flash HUD <100ms không âm (AC4)**; gater re-key theo `track_id`; `test_tracking.py` → **M1 done** | AC1: re-ID <5%/100 khung · AC2: sai vận tốc <10% (scale anchor, distance sim 30m sai <25%) · AC3: cắt ngưỡng 100m 1 lần → báo đúng 1 lần · AC4: flash <100ms |
 | **W3** | 02/11–08/11 | Tải MVRSD (verify Baidu; fallback AMAD/InvictusRex) + **VisDrone** (góc drone: person + 4 xe); **verify tham số thu** (độ cao/tốc độ/FOV) từ dataset card; prep data, map 8 class; **research nguồn `soldier`** (B9 — ưu tiên footage UAV tự quay) | `mvrsd-8c.yaml` hợp lệ, 3000 ảnh trên server; VisDrone subset 5 class; **tham số thu UAV ghi vào report**; B9 có kết quả |
 | **W4** | 09/11–15/11 | Fine-tune yolo26n → 8 class (MVRSD + **VisDrone** + `soldier` + COCO regression) + regression check → **M2 done** | `yolo val` mAP50 ≥0.75 (val MVRSD+VisDrone); mAP 6 class COCO giảm ≤5 điểm; tham số thu UAV ghi báo cáo (AC7) |
@@ -51,8 +51,9 @@ không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ 
   │  UAV ĐƯỢC CẤP (360P+)      │          │  LAPTOP C2 — TUF F15 (RTX 3050 4GB, Win11)  │
   │                            │  video   │                                             │
   │  camera ───────────────────┼─────────►│  YOLO 8c + ByteTrack → TrackStore          │
-  │   variant A: RTSP qua WiFi │          │    → gater (key = track_id) → SLM qwen2.5  │
-  │   variant B: FPV 5.8G → UVC│          │    → HUD OpenCV: box + minimap + cone FOV  │
+  │   variant A: RTSP qua WiFi │          │    → gater (key = track_id) → câu cảnh báo │
+  │   variant B: FPV 5.8G → UVC│          │      (template 0ms; SLM qwen2.5 optional)  │
+  │                            │          │    → HUD OpenCV: box + minimap + cone FOV  │
   │                            │ position │  TelemetryFeed UDP :8888 (interface giữ    │
   │  GPS / MAVLink ────────────┼─────────►│  nguyên, TTL 5s = STALE_AFTER_S)           │
   └────────────────────────────┘  1Hz     └─────────────────────────────────────────────┘
@@ -76,7 +77,7 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 | B3 | **Vị trí UAV** (GPS onboard / MAVLink?) | Không có → demo dùng vị trí mô phỏng, AC6 đạt qua sim | **Ngày UAV về (chưa rõ) + 1 tuần** | Kiểm tra link telemetry / GPS onboard |
 | B4 | Node ESP32+NEO-6M trong BOM **chưa mua** (`hardware-bom.md` ghi "chưa mua") | Không có node GPS vật lý → demo dùng `--soldier-gps` + đồng đội mô phỏng | W1 | Đếm kho; nếu không có → dùng đường sim (code đã hỗ trợ) |
 | B5 | **MVRSD qua Baidu pan** — server có truy cập không? | Trễ 1 tuần W3 → W4 trôi | W3 (ngày 1) | Test tải 1 file trên server; fallback AMAD / InvictusRex (GitHub release) |
-| B6 | **Chất lượng 360P** (người 20m ≈ 40–60px) | Detection rớt → phải tune imgsz/NMS ở W6 | W1 (video tổng hợp); retest frame thật khi UAV về | Chạy yolo26n trên 10 frame 640×360, log precision |
+| B6 | **Chất lượng 360P** (người 20m ≈ 40–60px) | Detection rớt → phải tune imgsz/NMS ở W6 | W1 (video tổng hợp); retest frame thật khi UAV về | **W1d5 ✓ (19/10):** `test_360p_precision.py` — 30 frame 640×360 (bus.jpg pan): **P 0.74 / R 0.79** (conf ≥0.25, person ~170px) — người to; khi UAV về retest frame thật (người 16–40px) mới là dữ liệu quyết định |
 | B7 | **SIM 4G** có sẵn không | Không có → chỉ WiFi (tầm ngắn), demo phải trong vùng phủ AP | W5 | Kiểm tra kho; không ảnh hưởng kiến trúc (4G là uplink dự phòng) |
 | B9 | **Nguồn ảnh class `soldier`** (dataset mở hay tự ghi footage thao trường?) | Không có → không fine-tune được class `soldier` (chỉ còn `person`) | W3d3 | Research dataset mở (GitHub); phương án dự phòng: tự ghi + label footage thao trường (cần đồng ý); nếu không có → escalate giảng viên (giữ 7 class) |
 
@@ -100,7 +101,7 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Tracking and gater track_id](./phase-01-tracking-and-gater-track-id.md) | Pending |
+| 1 | [Tracking and gater track_id](./phase-01-tracking-and-gater-track-id.md) | In progress (W1 ✓ 19/10, còn W2) |
 | 2 | [YOLO 8-class fine-tune MVRSD](./phase-02-yolo-8-class-fine-tune-mvrsd.md) | Pending |
 | 3 | [Private network VPN and 360P camera](./phase-03-private-network-vpn-and-360p-camera.md) | Pending |
 | 4 | [FOV patrol and integration](./phase-04-fov-patrol-and-integration.md) | Pending |
@@ -236,3 +237,48 @@ ngày W1–W12 khớp (W1 = T2 19/10) · dependencies P1–P5 đúng · B1–B9 
 **Còn mở (fix dần — có deadline trong register):** B1–B3 (UAV về, trước W9) · B5 (Baidu, W3d1) ·
 B6 (360P, W1 + retest) · B7 (SIM 4G, W5) · B9 (ảnh soldier, W3d3) · alt/FOV thực (B1) ·
 `military_vehicle` height 3.0m (verify W4).
+
+### Session 6 — 2026-10-19 (W1 thực thi: W1d1–W1d5)
+
+**Scope:** thực hiện W1 theo plan (code-only, UAV-agnostic).
+**Đã làm:**
+1. Cleanup: xóa `heretic_phase1.py` + `heretic_phase2.py` (prototype cũ 25/9); sửa docstring
+   `tactical_slm.py` (tham khảo phase2 → pipeline).
+2. Baseline đầu tuần: `test_telemetry_chain.py` **11/11 PASS** + `--sim` **16/16 khung**
+   (Ollama 11434 CPU-only timeout trên dev server → khung "quiet" — môi trường, không phải lỗi).
+3. **W1d1:** `heretic_phase4_hud.py` — `model()` → `model.track(persist=True,
+   tracker="bytetrack.yaml")`; verify trên `assets/bus-360p.mp4` (30 khung): `boxes.id`
+   ổn định, **0 re-ID** (3 person ids 1/2/12); overhead ByteTrack **1.5ms/khung <5ms**.
+4. **W1d2:** `tactical_tracker.py` (mới, 66 dòng) — `TrackStore`: update/velocity/approach/
+   prune, cửa sổ 5 khung, max_age 2s. `update` thêm tham số `scale` (velocity = Δpx/Δt×scale).
+5. **W1d3:** `build_tactical_data` + `enemies_payload` thêm `track_id` + `approach_mps`
+   (backward-compat: param optional, `.get()` trong payload).
+6. **W1d4:** `tactical_slm.py` `_key()` ưu tiên `track_id`, fallback `(target, bearing)` —
+   sim/demo không track không đổi hành vi.
+7. **W1d5:** `test_360p_precision.py` (mới) — video 640×360 30 khung từ bus.jpg (pan);
+   **P 0.74 / R 0.79** (conf ≥0.25) → log B6. assets/ thêm bus-720p-canvas.jpg + bus-360p.mp4.
+**Verify:** tester 6/6 PASS 0 regression · code-reviewer a–e PASS, 0 BLOCKER/MAJOR,
+5 MINOR (last_warned không prune — bounded, chấp nhận; file 234 dòng >200 — pre-existing;
+GT circularity 360P — documented; assets/ nên commit).
+**Còn mở W1 (cho W2):** `test_tracking.py` (AC1/AC2), object-height anchor (AC2/AC3),
+flash HUD (AC4), AC3 gater 100m, B4 (đếm kho node ESP32 — việc vật lý của user).
+
+### Session 7 — 2026-10-19 (quyết định: kênh câu chữ = template chính + SLM optional)
+
+**Câu hỏi (user):** "LLM vai trò quá mờ nhạt — nên loại bỏ, cảnh báo/logic/tính toán
+đặt ở back-end, sẽ nhẹ hơn."
+**Verify:** đúng một phần — logic đã 100% ở back-end (gater, distance, closest, flash);
+SLM chỉ render payload → câu tiếng Việt. Chi phí thật: ~2GB/4GB VRAM + 0,4–1,5s + phụ
+thuộc Ollama (timeout 10s khi down).
+**Decision (user chốt: hybrid):** template f-string = kênh chính (0ms, 0 VRAM, luôn hoạt
+động, `template_alert()` trong `tactical_slm.py`); SLM = optional qua `--slm`
+(warmup + call chỉ khi bật; Ollama down → fallback template). `DANGEROUS_TARGETS` +
+`soldier, military_vehicle` (forward-compat 8 class W4). `--sim` giờ 2,6s (trước ~2,5 phút)
+và ra khung `*_alert.png` có câu chữ.
+**Lý do không bỏ hẳn:** "câu chữ AI" là 1 trong 3 kênh của PDR + story đồ án + đã trình
+giảng viên; hybrid giữ story mà hệ robust hơn. Quantization: qwen2.5:3b Ollama đã là
+Q4_K_M (~2GB) — sweet spot, không đổi.
+**Impact:** `tactical_slm.py` (template_alert, evaluate_alert(use_slm), --slm) ·
+`heretic_phase4_hud.py` (--slm, warmup có điều kiện) · `test_telemetry_chain.py` (+3
+checks = 14) · PDR (header, §1, S1, S7, AC10, §7, risks) · briefing (header, §1, §4, §5) ·
+plan.md (architecture).
