@@ -1,13 +1,18 @@
 # PDR — Heretic Version C: Target, Scope & Acceptance Criteria
 
 **Dự án:** HUD chiến thuật cho lính — YOLO + cảnh báo tiếng Việt (template + SLM Ollama optional) + HUD + telemetry UAV
-**Ngày:** 2026-10-07 · **Cập nhật:** 2026-10-19 (kênh câu chữ: **template là chính** (0ms, 0 VRAM) + **SLM optional** `--slm` — giải phóng ~2GB VRAM, không phụ thuộc Ollama) · 2026-10-16 (feedback giảng viên: **dataset góc UAV** + **UAV theo dõi mục tiêu** + **FOV indicator** + **khoảng cách target→lính = tam giác phân GPS** (W7) + **object-height anchor** (W2) — UAV bay vòng quanh lính, không bay trên đầu; 2026-10-15: không tài trợ, mạng riêng WiFi/4G+VPN, UAV được cấp 360P+ — **chưa rõ ngày về**, 8 class chốt: person/soldier + 5 xe thường + military_vehicle)
+**Ngày:** 2026-10-07 · **Cập nhật:** 2026-10-23 (UAV demo: **i1 Pro** đã có (chim tập) + **DJI Mini 2 SE** (demo chính — GPS + áp kế + gimbal 1080P, user mua riêng); downlink = WiFi → app phone → scrcp; W7 tam giác phân GPS giữ nguyên) · 2026-10-19 (kênh câu chữ: **template là chính** (0ms, 0 VRAM) + **SLM optional** `--slm` — giải phóng ~2GB VRAM, không phụ thuộc Ollama) · 2026-10-16 (feedback giảng viên: **dataset góc UAV** + **UAV theo dõi mục tiêu** + **FOV indicator** + **khoảng cách target→lính = tam giác phân GPS** (W7) + **object-height anchor** (W2) — UAV bay vòng quanh lính, không bay trên đầu; 2026-10-15: không tài trợ, mạng riêng WiFi/4G+VPN, UAV được cấp 360P+ — **chưa rõ ngày về**, 8 class chốt: person/soldier + 5 xe thường + military_vehicle)
 **Runtime target:** Asus TUF F15 FX507 — RTX 3050 (4GB VRAM), i7-12700H, 16GB DDR4, **Windows 11**
 **Kịch bản:** 1 lính + 1 UAV. Phi sát thương — chỉ phát hiện + cảnh báo, không vũ khí tự động.
 
 > **GIẢ ĐỊNH 2026-10-15: KHÔNG CÓ TÀI TRỢ** — chỉ dùng thiết bị có sẵn:
-> laptop TUF F15, server dev (4× RTX 5000 Ada — fine-tune), **UAV được cấp (camera 360P+)**.
+> laptop TUF F15, server dev (4× RTX 5000 Ada — fine-tune), UAV demo (xem dưới).
 > Mọi phần cứng mua mới (LoRa, E88 Pro, module rung, Lepton) = **BLOCKED** cho tới khi user báo phần cứng mới.
+> **UAV demo (cập nhật 2026-10-23):** **i1 Pro** (mini drone 360–480P, WiFi → app phone,
+> không GPS/MAVLink — chim tập, đã có tay) + **DJI Mini 2 SE** (249g, **GPS + áp kế + gimbal
+> 1080P**, bay 31 phút — demo chính, user mua riêng; downlink = DJI Fly (app phone) →
+> **scrcp USB → laptop**; MAVLink giới hạn qua **DJI Virtual Port**). UAV "được cấp" (nếu về)
+> = lựa chọn thay thế.
 
 ---
 
@@ -38,9 +43,9 @@ chưa chạy được đủ AC1–AC11 (AC4 = chế độ fallback hình ảnh c
 | S1 | **Tracking (ByteTrack)** | Real-time; track_id ổn định; tính **vận tốc + tốc độ tiếp cận**; gater chuyển key từ `(target, bearing)` sang `track_id`; **nhiều target → cảnh báo target gần nhất** (câu cảnh báo + HUD có khoảng cách m + hướng từ lính); **khoảng cách target→lính**: W2 **object-height anchor** (scale = kích thước thật class / chiều cao box, ±15–25%, không cần alt UAV) → W7 **tam giác phân GPS** (GPS UAV + alt + góc chúi + FOV + pixel → lat/lon target → 2D tới lính, ±10–15%) — model pixel-scale cố định 0.05 chỉ đúng ở độ cao ~15–22m (sai ×1.5–3 ở 30–50m) | AC1–AC3 |
 | S2 | **Kênh cảnh báo im lặng** | **Hiện tại: HUD flash + SLM (chưa có module rung).** Haptic (Arduino + motor) giữ làm mục blocked — bật lại khi có phần cứng, AC4 fallback = flash hình <100ms | AC4 |
 | S3 | **Mạng riêng WiFi/4G + VPN (WireGuard)** | **Thay LoRa** (quyết định 2026-10-15). UDP transport giữ nguyên, thêm lớp VPN; **interface `TelemetryFeed` không đổi**; link đứt → chế độ cục bộ TTL 5s (đã có `STALE_AFTER_S`) | AC5 |
-| S4 | **UAV tuần tra + FOV + theo dõi** | Flycam bay theo lộ trình quanh vị trí người được bảo vệ (MAVLink nếu UAV hỗ trợ, nếu không = bay tay theo route gợi ý); laptop vẽ **vùng phủ camera** (cone) lên minimap; **chế độ follow: UAV bay theo vị trí mục tiêu** (sim: theo track; real: MAVLink GOTO / HUD chỉ hướng cho phi công); **indicator target trong/ngoài tầm nhìn UAV**; mode sim khi chưa bay thật | AC6 |
+| S4 | **UAV tuần tra + FOV + theo dõi** | Flycam bay theo lộ trình quanh vị trí người được bảo vệ (MAVLink qua DJI Virtual Port của Mini 2 SE nếu verify OK, nếu không = bay tay theo route gợi ý); laptop vẽ **vùng phủ camera** (cone) lên minimap; **chế độ follow: UAV bay theo vị trí mục tiêu** (sim: theo track; real: MAVLink GOTO / HUD chỉ hướng cho phi công); **indicator target trong/ngoài tầm nhìn UAV**; mode sim khi chưa bay thật | AC6 |
 | S5 | **YOLO 8 class (góc UAV)** | 8 class (chốt 2026-10-15): `person, soldier, car, motorcycle, truck, bus, boat, military_vehicle` — **gộp tất cả xe quân sự thành 1 class** (không phân tank/IFV/pháo), **loại máy bay**, **phân biệt người thường/lính**. Dataset **đặc thù UAV** (yêu cầu giảng viên 2026-10-16): MVRSD (góc drone/satellite, gộp label) + **VisDrone** (ảnh drone: person + 4 xe) + footage UAV thật tự quay (khi UAV về — gold standard, đồng thời là nguồn `soldier` B9); **tham số thu (độ cao, tốc độ, FOV) ghi vào báo cáo**; server multi-GPU; **pin version ultralytics server=laptop** | AC7 |
-| S6 | **Demo UAV được cấp (camera 360P+)** | Video source abstraction (webcam / RTSP / UVC / file); hiệu chỉnh YOLO cho input 360P; chạy demo end-to-end bằng UAV thật | AC8 |
+| S6 | **Demo UAV (i1 Pro / Mini 2 SE, 360P+)** | Video source abstraction (webcam / RTSP / UVC / file / **scrcp phone**); hiệu chỉnh YOLO cho input 360P; chạy demo end-to-end bằng UAV thật | AC8 |
 | S7 | **Kênh câu chữ (template + SLM optional)** | template f-string = **chính** (0ms, 0 VRAM, luôn hoạt động); SLM qwen2.5:3b Ollama = optional qua `--slm` (cảnh báo tiếng Việt ≤12 từ, advisory chỉ cho C2) — **không** vào vòng lặp thời gian thực | AC10 |
 
 **Dataset 8 class — trả lời "bao nhiêu đối tượng, cụ thể gì" (yêu cầu giảng viên 2026-10-16):**
@@ -78,7 +83,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 | AC5 | Mạng riêng VPN | Bench 2 node qua WiFi + WireGuard: HUD nhận position 1Hz; cắt link mô phỏng đứt | Bench: sai <1m so sim; đứt link → local mode sau ≤5s, không crash |
 | AC6 | UAV patrol + FOV + follow | `--sim` với lộ trình waypoints + mục tiêu di động (bay thật ở M4) | Cone FOV đúng hướng; **UAV sim bay theo vị trí mục tiêu (follow mode)**; indicator trong/ngoài tầm nhìn đúng |
 | AC7 | YOLO 8 class (góc UAV) | `yolo val` trên val (MVRSD + VisDrone + soldier) + 1 clip demo có lính + xe quân sự | mAP50 ≥ 0,75; soldier + military_vehicle được box + SLM cảnh báo; **mAP 6 class COCO không giảm >5%**; weight chạy trên 3050 (cùng version ultralytics); **tham số thu (độ cao/tốc độ/FOV) ghi trong báo cáo** |
-| AC8 | UAV được cấp live | Video 360P+ từ UAV → HUD | ≥15fps; người trong khung → cảnh báo <2s |
+| AC8 | UAV demo live | Video 360P+ từ UAV (i1 Pro / Mini 2 SE) → HUD | ≥15fps; người trong khung → cảnh báo <2s |
 | AC9 | VRAM 4GB | `nvidia-smi -l 1` 30s đầu chạy full; cố tình OOM | <3,8GB ổn định; `--cpu` khởi động lại bình thường |
 | AC10 | Câu cảnh báo | Log `--sim` | template: 0ms, luôn hoạt động (không phụ thuộc Ollama); SLM optional: <1,5s/call (warm), câu ≤12 từ, tiếng Việt |
 | AC11 | Demo end-to-end | Kịch bản demo 10 phút (§7) chạy một lượt | Không interrupt; đủ kênh cảnh báo |
@@ -125,7 +130,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 
 | Rủi ro | Mitigation |
 |--------|------------|
-| **Downlink của UAV được cấp chưa rõ** (FPV 5,8G? WiFi RTSP? USB?) — điểm mù số 1 | Verify **khi UAV về tay** (chưa rõ ngày; trước W9); W1–W6 build sim-first; variant video M3 chốt khi nhận máy |
+| **FOV/alt thực + DJI Virtual Port của Mini 2 SE chưa verify** (input tam giác phân GPS + tuần tra) — *downlink đã rõ 23/10: WiFi → app phone → scrcp* | i1 Pro bay thử ngay (chim tập + test scrcp); Mini 2 SE: verify khi về tay (trước W9); W1–W6 build sim-first |
 | Chất lượng detection trên 360P (người 20m chỉ ~40–60 px) | Chạy model hiện tại trên frame 360P mẫu ở tuần 1; hiệu chỉnh input size/NMS ở M3 |
 | MVRSD tải qua Baidu — server có thể không truy cập | Verify tuần 3; fallback: AMAD/InvictusRex (GitHub release) |
 | Fine-tune 8 class degrade 6 class COCO cũ | Fine-tune trộn MVRSD + COCO; AC7 yêu cầu mAP COCO không giảm >5% |
@@ -137,9 +142,9 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 
 ## 10. Câu hỏi mở (chưa giải quyết)
 
-1. **UAV được cấp về tay ngày nào** (chưa rõ) + downlink video là loại gì (FPV 5,8GHz / WiFi RTSP / USB)? → quyết định thiết kế M3 — verify khi nhận máy; trước đó build sim-first.
-2. UAV có hỗ trợ **MAVLink/GCS** (tuần tra tự động) không?
+1. **Downlink video** — ĐÃ RÕ (23/10): i1 Pro + Mini 2 SE đều **WiFi → app phone** → bridge **scrcp USB → laptop** (chốt M3).
+2. **DJI Virtual Port** (Mini 2 SE) có GOTO/waypoint ổn định không (tuần tra tự động)? → verify khi nhận máy; fallback bay tay theo route gợi ý.
 3. Có sẵn **SIM 4G/data** nào không (nếu không → chỉ dùng WiFi riêng)?
 4. Module rung (haptic) có được cấp thêm sau này không?
 5. **Nguồn ảnh class `soldier`** (B9) — dataset mở hay tự ghi footage thao trường? → research W3, chốt trước train W4.
-6. UAV được cấp có gửi **độ cao (alt)** (GPS/áp kế) không? → input tam giác phân GPS (W7) — verify cùng B1 khi nhận máy.
+6. Alt + góc gimbal — Mini 2 SE: **có áp kế + đọc góc gimbal trong app** (23/10) → input tam giác phân GPS (W7); verify số liệu thực khi nhận máy.

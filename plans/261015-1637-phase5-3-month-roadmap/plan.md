@@ -18,7 +18,9 @@ source: skill
 ## Overview
 
 Kế hoạch thực thi Phase 5 (definition of done của đồ án) trong đúng 12 tuần, ngân sách 0 đồng:
-chỉ dùng laptop TUF F15 (runtime), server 4× RTX 5000 Ada (fine-tune), UAV được cấp (camera 360P+).
+chỉ dùng laptop TUF F15 (runtime), server 4× RTX 5000 Ada (fine-tune), UAV demo:
+**i1 Pro** (mini drone 360–480P, WiFi → app phone — chim tập, đã có tay 23/10) +
+**DJI Mini 2 SE** (249g, GPS + áp kế + gimbal 1080P — demo chính, user mua riêng, chưa có).
 Mỗi tuần có 1 deliverable đo được; mọi điểm mù được ghi nhận và có deadline giải quyết.
 Nguồn scope: `docs/project-overview-pdr.md` (S1–S7, AC1–AC11).
 
@@ -36,9 +38,9 @@ không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ 
 | **W4** | 09/11–15/11 | Fine-tune yolo26n → 8 class (MVRSD + **VisDrone** + `soldier` + COCO regression) + regression check → **M2 done** | `yolo val` mAP50 ≥0.75 (val MVRSD+VisDrone); mAP 6 class COCO giảm ≤5 điểm; tham số thu UAV ghi báo cáo (AC7) |
 | **W5** | 16/11–22/11 | **Sim-first**: dựng bench 2 node (laptop + node 2) + WireGuard, `udp_position_sender.py` — không phụ thuộc UAV | `wg show` 2 peer active; ping <20ms; `test_vpn_link.py` PASS (AC5 phần bench) |
 | **W6** | 23/11–29/11 | Video source abstraction (`--source webcam/rtsp/uvc/file`); hiệu chỉnh YOLO cho 360P → **M3 done** | ≥15fps @360P; người trong khung → cảnh báo <2s (nửa AC8) |
-| **W7** | 30/11–06/12 | Cone FOV trên minimap + **badge target trong/ngoài tầm nhìn** + tuần tra + **chế độ follow target** (MAVLink nếu hỗ trợ, nếu không = route gợi ý tay + HUD chỉ hướng) + **tam giác phân GPS** (`tactical_geolocation.py`: pose UAV + pixel → lat/lon target; `alt` vào payload UDP; đo FOV → B1) | `--sim` lộ trình waypoint: cone đúng hướng, **UAV bay theo vị trí mục tiêu**, **khoảng cách target→lính sai <15%** so ground truth (AC6 sim) |
+| **W7** | 30/11–06/12 | Cone FOV trên minimap + **badge target trong/ngoài tầm nhìn** + tuần tra + **chế độ follow target** (MAVLink qua DJI Virtual Port nếu verify OK, nếu không = route gợi ý tay + HUD chỉ hướng) + **tam giác phân GPS** (`tactical_geolocation.py`: pose UAV + pixel → lat/lon target; `alt` vào payload UDP; đo FOV → B1) | `--sim` lộ trình waypoint: cone đúng hướng, **UAV bay theo vị trí mục tiêu**, **khoảng cách target→lính sai <15%** so ground truth (AC6 sim) |
 | **W8** | 07/12–13/12 | Tích hợp full: telemetry qua VPN, 3 chế độ degradation (full/position-only/local), link-loss test → **M4 done** | AC6 (bay thật nếu được, nếu không sim+bench); AC8: 10 phút live ổn định; cắt link → local ≤5s không crash |
-| **W9** | 14/12–20/12 | Field test 1 với UAV được cấp (5 kịch bản, ghi log + video) | Log: 5/5 kịch bản chạy, issue list đã triage (critical/minor) |
+| **W9** | 14/12–20/12 | Field test 1 với UAV demo (Mini 2 SE; i1 Pro nếu chưa kịp) — 5 kịch bản, ghi log + video | Log: 5/5 kịch bản chạy, issue list đã triage (critical/minor) |
 | **W10** | 21/12–27/12 | Stress: VRAM 4GB, link loss, latency + fix | AC9: <3.8GB/30s, OOM → `--cpu` khởi động lại OK; 5 vòng cắt/ghép link ≤5s |
 | **W11** | 28/12–03/01 | Demo end-to-end 10 phút (kịch bản PDR §7) + 2 buổi rehearsal | AC11: 1 lượt chạy không interrupt, có ghi hình; re-verify AC1–AC11 |
 | **W12** | 04/01–10/01 | Tài liệu đồ án (cập nhật `docs/`, báo cáo cuối) + buffer | `docs/` đồng bộ (deployment + VPN, PDR status, BOM status); báo cáo đồ án đủ bảng kết quả AC1–AC11 |
@@ -48,14 +50,15 @@ không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ 
 ```
                     MẠNG RIÊNG (WiFi/4G) + WireGuard
   ┌────────────────────────────┐          ┌─────────────────────────────────────────────┐
-  │  UAV ĐƯỢC CẤP (360P+)      │          │  LAPTOP C2 — TUF F15 (RTX 3050 4GB, Win11)  │
-  │                            │  video   │                                             │
-  │  camera ───────────────────┼─────────►│  YOLO 8c + ByteTrack → TrackStore          │
-  │   variant A: RTSP qua WiFi │          │    → gater (key = track_id) → câu cảnh báo │
-  │   variant B: FPV 5.8G → UVC│          │      (template 0ms; SLM qwen2.5 optional)  │
-  │                            │          │    → HUD OpenCV: box + minimap + cone FOV  │
+  │  UAV DEMO                  │          │  LAPTOP C2 — TUF F15 (RTX 3050 4GB, Win11)  │
+  │  i1 Pro (tập) / Mini 2 SE  │  video   │                                             │
+  │  (demo: GPS + gimbal)      │          │  YOLO 8c + ByteTrack → TrackStore          │
+  │  camera ───────────────────┼─────────►│    → gater (key = track_id) → câu cảnh báo │
+  │   WiFi → app phone (DJI Fly)          │      (template 0ms; SLM qwen2.5 optional)  │
+  │   → scrcp USB → laptop    │          │    → HUD OpenCV: box + minimap + cone FOV  │
   │                            │ position │  TelemetryFeed UDP :8888 (interface giữ    │
-  │  GPS / MAVLink ────────────┼─────────►│  nguyên, TTL 5s = STALE_AFTER_S)           │
+  │  GPS + alt + góc gimbal    │          │  nguyên, TTL 5s = STALE_AFTER_S)           │
+  │  (Mini 2 SE) ──────────────┼─────────►│                                             │
   └────────────────────────────┘  1Hz     └─────────────────────────────────────────────┘
                                     JSON
   ┌────────────────────────────┐          ┌─────────────────────────────────────────────┐
@@ -72,12 +75,12 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 
 | # | Điểm mù | Impact | Khi nào hết mù | Cách giải quyết |
 |---|---------|--------|----------------|-----------------|
-| B1 | **Downlink video UAV** (FPV 5.8G / WiFi RTSP / USB?) + **alt + FOV** (input tam giác phân GPS) | Định hình variant video W6 (A: RTSP / B: UVC); geolocation W7 (nominal h=30m, FOV 60° tới đó); W5–W4 không phụ thuộc | **Ngày UAV về (chưa rõ) + 1 tuần** | Mở hộp, đọc spec, test kết nối 10 phút; **đo FOV (bay 30m, đánh dấu 2 điểm cách 10m, đếm pixel) + verify alt**; ghi kết quả vào đây; tới trước W9 (field test) |
-| B2 | **MAVLink/GCS** của UAV | W7: upload waypoint tự động (variant A) vs bay tay theo route gợi ý (variant B — build trước) | **Ngày UAV về (chưa rõ) + 1 tuần** | Cắm radio telemetry + QGroundControl |
-| B3 | **Vị trí UAV** (GPS onboard / MAVLink?) | Không có → demo dùng vị trí mô phỏng, AC6 đạt qua sim | **Ngày UAV về (chưa rõ) + 1 tuần** | Kiểm tra link telemetry / GPS onboard |
+| B1 | **alt + FOV thực của Mini 2 SE** (input tam giác phân GPS) — *downlink đã rõ 23/10: cả i1 Pro lẫn Mini 2 SE đều WiFi → app phone → scrcp USB → laptop* | Variant video W6 = phone-scrcp (chốt 23/10); geolocation W7 (nominal h=30m, FOV 60° tới đó) | **Khi Mini 2 SE về tay + 1 tuần** | **Đo FOV (bay 30m, đánh dấu 2 điểm cách 10m, đếm pixel) + verify alt + đọc góc gimbal app**; ghi kết quả vào đây; tới trước W9 (field test) |
+| B2 | **MAVLink/GCS** — Mini 2 SE: **DJI Virtual Port** (MAVLink tập hợp giới hạn: telemetry + GOTO/waypoint) — verify thực | W7: upload waypoint tự động (variant A) vs bay tay theo route gợi ý (variant B — build trước) | **Khi Mini 2 SE về tay + 1 tuần** | DJI Assistant/virtual port + QGroundControl; i1 Pro: không MAVLink (chỉ chim tập) |
+| B3 | **Vị trí UAV** — Mini 2 SE: **có GPS + áp kế** ✓ (spec 23/10); i1 Pro: không GPS (chỉ chim tập) | W7 tam giác phân GPS khả thi với Mini 2 SE | **Đóng khi Mini 2 SE về tay** (verify GPS lock + alt) | i1 Pro không block gì (chỉ tập bay + test scrcp bridge) |
 | B4 | Node ESP32+NEO-6M trong BOM **chưa mua** (`hardware-bom.md` ghi "chưa mua") | Không có node GPS vật lý → demo dùng `--soldier-gps` + đồng đội mô phỏng | W1 | Đếm kho; nếu không có → dùng đường sim (code đã hỗ trợ) |
 | B5 | **MVRSD qua Baidu pan** — server có truy cập không? | Trễ 1 tuần W3 → W4 trôi | W3 (ngày 1) | Test tải 1 file trên server; fallback AMAD / InvictusRex (GitHub release) |
-| B6 | **Chất lượng 360P** (người 20m ≈ 40–60px) | Detection rớt → phải tune imgsz/NMS ở W6 | W1 (video tổng hợp); retest frame thật khi UAV về | **W1d5 ✓ (19/10):** `test_360p_precision.py` — 30 frame 640×360 (bus.jpg pan): **P 0.74 / R 0.79** (conf ≥0.25, person ~170px) — người to; khi UAV về retest frame thật (người 16–40px) mới là dữ liệu quyết định |
+| B6 | **Chất lượng 360P** (người 20m ≈ 40–60px) | Detection rớt → phải tune imgsz/NMS ở W6 | W1 (video tổng hợp); retest frame thật khi UAV về | **W1d5 ✓ (19/10):** `test_360p_precision.py` — 30 frame 640×360 (bus.jpg pan): **P 0.74 / R 0.79** (conf ≥0.25, person ~170px) — người to; khi bay thật (i1 Pro / Mini 2 SE) retest frame thật (người 16–40px) mới là dữ liệu quyết định |
 | B7 | **SIM 4G** có sẵn không | Không có → chỉ WiFi (tầm ngắn), demo phải trong vùng phủ AP | W5 | Kiểm tra kho; không ảnh hưởng kiến trúc (4G là uplink dự phòng) |
 | B9 | **Nguồn ảnh class `soldier`** (dataset mở hay tự ghi footage thao trường?) | Không có → không fine-tune được class `soldier` (chỉ còn `person`) | W3d3 | Research dataset mở (GitHub); phương án dự phòng: tự ghi + label footage thao trường (cần đồng ý); nếu không có → escalate giảng viên (giữ 7 class) |
 
@@ -114,16 +117,16 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 - **P2 → P5** — model 8 class dùng trong demo W11.
 - **P3 → P4** — integration cần VPN + camera 360P đã có.
 - **P4 → P5** — field test/demo trên hệ tích hợp xong.
-- **Ngoại bộ:** UAV về tay — gate B1–B3, **chưa rõ ngày về** (2026-10-15); chỉ block khối W5–W8 (variant video W6 + bay thật W8/W9), **W1–W4 không bị block** (sim-first); quyền truy cập Baidu (gate B5, khối W4); nguồn ảnh `soldier` (gate B9, khối W4 train).
+- **Ngoại bộ:** UAV demo — i1 Pro **đã có tay 23/10 (chim tập)**; Mini 2 SE **chưa có** (user mua riêng) — gate B1–B3 còn lại (đo FOV/alt + verify DJI Virtual Port) khi Mini 2 SE về tay; chỉ block khối W5–W8 (bay thật W8/W9), **W1–W4 không bị block** (sim-first); quyền truy cập Baidu (gate B5, khối W4); nguồn ảnh `soldier` (gate B9, khối W4 train).
 
 ## Open questions
 
-1. **UAV được cấp về tay ngày nào** (chưa rõ, 2026-10-15) + **downlink video** là loại gì (FPV 5.8GHz / WiFi RTSP / USB)? → quyết định thiết kế W5–W8 — verify khi nhận máy; trước đó build sim-first.
-2. UAV có hỗ trợ **MAVLink/GCS** (tuần tra tự động) không? → variant A/B tuần tra W7.
+1. **Downlink video** — ĐÃ RÕ (23/10): i1 Pro + Mini 2 SE đều **WiFi → app phone** (DJI Fly) → bridge **scrcp USB → laptop** (variant video W6 chốt). UAV "được cấp" (nếu về) vẫn là lựa chọn thay thế.
+2. **DJI Virtual Port** (Mini 2 SE) có GOTO/waypoint ổn định không (tuần tra tự động)? → verify khi nhận máy → variant A/B tuần tra W7.
 3. Có sẵn **SIM 4G/data** nào không? → nếu không: chỉ WiFi riêng (demo trong vùng phủ AP).
 4. Module rung (haptic) có được cấp thêm sau này không? → giữ blocked; AC4 fallback flash + SLM.
 5. **Nguồn ảnh class `soldier`** (B9) — dataset mở hay tự ghi footage thao trường? → research W3, chốt trước train W4.
-6. UAV được cấp có gửi **độ cao (alt)** không? → input tam giác phân GPS (W7) — verify cùng B1 khi nhận máy.
+6. Alt + góc gimbal — Mini 2 SE: **có áp kế + đọc góc gimbal trong app** ✓ (23/10) → input tam giác phân GPS (W7); verify số liệu thực khi nhận máy.
 
 ## Validation Log
 
@@ -282,3 +285,18 @@ Q4_K_M (~2GB) — sweet spot, không đổi.
 `heretic_phase4_hud.py` (--slm, warmup có điều kiện) · `test_telemetry_chain.py` (+3
 checks = 14) · PDR (header, §1, S1, S7, AC10, §7, risks) · briefing (header, §1, §4, §5) ·
 plan.md (architecture).
+
+### Session 8 — 2026-10-23 (UAV demo chốt: i1 Pro + Mini 2 SE, W7 giữ nguyên)
+
+**Bối cảnh:** UAV "được cấp" chưa rõ ngày về; user mua **i1 Pro** (Shopee, mini drone
+360–480P, WiFi → app phone 50–100m, 2.4GHz, pin 10–15 phút, không GPS, không MAVLink).
+**Decision (user chốt):** (1) **i1 Pro = chim tập** (rèn phi công + test scrcp bridge);
+(2) **chờ DJI Mini 2 SE làm UAV demo chính** (249g, GPS + áp kế + gimbal 1080P, bay 31 phút,
+user mua riêng ~7–9tr) — **W7 tam giác phân GPS giữ nguyên** (user không muốn bỏ W7);
+(3) downlink cả 2 drone = **WiFi → app phone → scrcp USB → laptop** → **variant video W6 chốt**
+(loại RTSP/FPV 5.8G); (4) S4: Mini 2 SE có **DJI Virtual Port** (MAVLink giới hạn:
+GOTO/waypoint) → patrol/follow mode đầy đủ, verify khi nhận máy; i1 Pro không MAVLink.
+**Impact:** plan.md (overview, sơ đồ, W7/W9, B1–B3, B6, dependencies, open Q1/Q2/Q6) ·
+PDR (header, giả định, S4, S6, AC8, risks, open Q1/Q2/Q6) · briefing (header, §1, §6, §7, §8).
+**Còn mở:** ngày mua Mini 2 SE (cần về trước W9); đo FOV/alt + verify virtual port (B1/B2
+khi nhận máy); 5 câu spec i1 Pro (GPS/app/tilt/trần bay/pin) — giảm độ ưu tiên vì chỉ chim tập.

@@ -1,6 +1,6 @@
 # Heretic Version C — Báo Cáo Trình Bày Cho Giảng Viên Hướng Dẫn
 
-**Ngày:** 2026-10-12 · **Cập nhật:** 2026-10-19 (kênh câu chữ: **template là chính** (0ms, 0 VRAM)
+**Ngày:** 2026-10-12 · **Cập nhật:** 2026-10-23 (UAV demo: **i1 Pro** đã có (chim tập) + **DJI Mini 2 SE** (demo chính — GPS + áp kế + gimbal 1080P, user mua riêng); downlink = WiFi → app phone → scrcp; W7 tam giác phân GPS giữ nguyên) · 2026-10-19 (kênh câu chữ: **template là chính** (0ms, 0 VRAM)
 + **SLM optional** `--slm` — không phụ thuộc Ollama, giải phóng ~2GB VRAM) · 2026-10-16 (feedback
 giảng viên: dataset góc UAV + UAV theo dõi mục tiêu + FOV indicator + **khoảng cách target→lính
 = tam giác phân GPS** — UAV bay vòng quanh lính, không bay trên đầu — mục §3) · 2026-10-15
@@ -20,7 +20,8 @@ qua GPS → cảnh báo qua 3 kênh: **hình** (bounding box + minimap), **im l�
 (FLASH HUD <100ms — OPSEC, không lộ vị trí; haptic rung khi có phần cứng),
 và **câu chữ** (template 0ms là chính; SLM tiếng Việt optional qua `--slm` — cho màn chỉ huy). Chạy thời gian thực trên laptop cá nhân
 (RTX 3050 4GB), liên kết UAV qua **mạng riêng WiFi/4G + WireGuard VPN**
-— không phụ thuộc hạ tầng dân dụng. Kịch bản: **1 lính + 1 UAV được cấp** —
+— không phụ thuộc hạ tầng dân dụng. Kịch bản: **1 lính + 1 UAV demo** (i1 Pro tập +
+Mini 2 SE demo chính — GPS + gimbal) —
 UAV bay quanh vị trí người được bảo vệ và **bay theo mục tiêu phát hiện**.
 
 ## 2. Target & scope (tóm tắt — chi tiết trong PDR)
@@ -37,8 +38,8 @@ UAV bay quanh vị trí người được bảo vệ và **bay theo mục tiêu 
   track ID re-ID <5% trên 100 khung; flash cảnh báo <100ms không phát âm;
   mAP50 ≥0,75 trên val MVRSD; VRAM <3,8GB; demo end-to-end 10 phút không interrupt.
 - **Giới hạn cứng (2026-10-15):** ngân sách 0 VND mua mới — chỉ dùng laptop TUF F15,
-  server dev 4× RTX 5000 Ada, UAV được cấp (camera 360P+). Haptic/thermal/mesh đa lính
-  = Phase 6, chỉ khi có phần cứng/tài trợ.
+  server dev 4× RTX 5000 Ada, UAV demo (i1 Pro tập + Mini 2 SE demo chính — cập nhật 2026-10-23).
+  Haptic/thermal/mesh đa lính = Phase 6, chỉ khi có phần cứng/tài trợ.
 
 ## 3. Trả lời feedback giảng viên (2026-10-16)
 
@@ -130,14 +131,14 @@ không cần hạ tầng riêng.
 UAV được cấp. Phần cứng mới (haptic, ESP32 node, thermal) chỉ khi được cấp/tài trợ.
 
 **Register điểm mù (B1–B9)** — mọi điểm mù có deadline giải quyết (plan.md):
-UAV chưa rõ ngày về (B1–B3 → verify khi UAV về, trước W9); nguồn ảnh class `soldier` (B9 → W3d3);
+UAV: i1 Pro đã có (chim tập), Mini 2 SE (demo chính) — B1–B3 còn lại: đo FOV/alt + verify DJI Virtual Port khi về, trước W9; nguồn ảnh class `soldier` (B9 → W3d3);
 truy cập Baidu (B5 → W3d1); 360P chất lượng (B6 → W1 bước 1, retest khi UAV về)…
 
 ## 7. Rủi ro chính
 
 | Rủi ro | Mitigation |
 |--------|------------|
-| **Downlink của UAV được cấp chưa rõ** (FPV 5.8G? WiFi RTSP? USB?) — điểm mù số 1 | Verify khi nhận UAV (trước W9); build sim-first W1–W6; 2 variant đã thiết kế sẵn |
+| **FOV/alt thực + DJI Virtual Port của Mini 2 SE chưa verify** (downlink đã rõ 23/10: WiFi → app phone → scrcp) | i1 Pro bay thử ngay; Mini 2 SE verify khi về (trước W9); build sim-first W1–W6 |
 | Chất lượng detection trên 360P (người 20m chỉ ~40–60 px) | W1: test model hiện tại trên 360P tổng hợp; tune imgsz/NMS ở W6 |
 | MVRSD tải qua Baidu — server có thể không truy cập | Verify W3d1; fallback: AMAD/InvictusRex (GitHub release) |
 | Không có nguồn ảnh class `soldier` (B9) | Research W3d3; fallback: tự ghi footage thao trường; nếu không → escalate (giữ 7 class) |
@@ -150,7 +151,7 @@ truy cập Baidu (B5 → W3d1); 360P chất lượng (B6 → W1 bước 1, retes
 2. 8 class chốt (`person, soldier` + 5 xe thường + `military_vehicle` gộp) với dataset góc UAV
    (MVRSD drone + **VisDrone** + footage UAV tự quay, tham số thu độ cao 30–50m / 3–5 m/s
    ghi trong báo cáo) — chấp nhận, hay cần tách lại class xe quân sự / thêm nguồn dataset?
-3. UAV được cấp chưa rõ ngày về — nếu UAV về sau W8, demo W11 chạy bằng **replay video 360P**
+3. Mini 2 SE (UAV demo) chưa có — nếu về sau W8, demo W11 chạy bằng **replay video 360P**
    (PDR cho phép) có chấp nhận không?
 4. Module rung (haptic) có khả năng được cấp thêm trước demo không? Nếu không →
    cảnh báo im lặng = flash HUD <100ms (fallback đã chốt).
