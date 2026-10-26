@@ -1,6 +1,6 @@
 # Heretic Version C — Báo Cáo Trình Bày Cho Giảng Viên Hướng Dẫn
 
-**Ngày:** 2026-10-12 · **Cập nhật:** 2026-10-23 (UAV demo: **i1 Pro** đã có (chim tập) + **DJI Mini 2 SE** (demo chính — GPS + áp kế + gimbal 1080P, user mua riêng); downlink = WiFi → app phone → scrcp; W7 tam giác phân GPS giữ nguyên) · 2026-10-19 (kênh câu chữ: **template là chính** (0ms, 0 VRAM)
+**Ngày:** 2026-10-12 · **Cập nhật:** 2026-10-26 (W2 xong → **M1 done**: object-height anchor (sim 30m: sai 1.2–1.3%), flash HUD 100ms (AC4), AC1 re-ID 0.0%/150 khung, AC2 vận tốc 1.2%, AC3 1 cảnh báo/ngưỡng) · 2026-10-23 (UAV demo: **i1 Pro** đã có (chim tập) + **DJI Mini 2 SE** (demo chính — GPS + áp kế + gimbal 1080P, user mua riêng); downlink = WiFi → app phone → scrcp; W7 tam giác phân GPS giữ nguyên) · 2026-10-19 (kênh câu chữ: **template là chính** (0ms, 0 VRAM)
 + **SLM optional** `--slm` — không phụ thuộc Ollama, giải phóng ~2GB VRAM) · 2026-10-16 (feedback
 giảng viên: dataset góc UAV + UAV theo dõi mục tiêu + FOV indicator + **khoảng cách target→lính
 = tam giác phân GPS** — UAV bay vòng quanh lính, không bay trên đầu — mục §3) · 2026-10-15
@@ -94,14 +94,17 @@ bearing = la bàn thật từ 2 GPS, không phụ thuộc hướng camera. Bay v
 | Pipeline YOLO26n → gater 100/10/1m → SLM → HUD | Chạy được, 6 class COCO | `heretic_phase4_hud.py`, chế độ `--sim` xuất 16 khung ảnh |
 | Kênh câu chữ: template (chính, 0ms) + SLM qwen2.5:3b optional (`--slm`) | SLM latency đã đo: floor ~0,4s (server), ước 0,8–1,5s (laptop); template = 0ms, không cần Ollama | `tactical_slm.py --demo` (template) / `--demo --slm` |
 | HUD quân dụng: bbox + minimap + địch/đồng đội theo GPS (bán kính 8m) | Hoàn thành | `tactical_hud_renderer.py` |
-| Chuỗi telemetry UAV: GPS → UDP 1Hz → HUD | **11/11 kiểm thử PASS** (kèm ảnh minh chứng) | `test_telemetry_chain.py` |
+| Object-height anchor (W2) + sim physics 30m/FOV60° | Hoàn thành — sim 15m/10m → sai **1.2–1.3%** (constant 0.05 cũ: sai ×1.92) | `tactical_height_anchor.py`, `test_tracking.py` |
+| Flash HUD cảnh báo im lặng (W2, AC4) | Hoàn thành — 3 khung @30fps ≈ 100ms, không phát âm | `tactical_hud_renderer.py` |
+| Chuỗi telemetry UAV: GPS → UDP 1Hz → HUD | **20/20 kiểm thử PASS** (kèm ảnh minh chứng) | `test_telemetry_chain.py` |
+| Tracking + gater (W2): AC1 re-ID **0.0%**/150 khung, AC2 vận tốc sai **1.2%**, AC3 cắt ngưỡng 100m = 1 cảnh báo, 3 target → gần nhất | **7/7 checks PASS** (YOLO26n + ByteTrack thật) | `test_tracking.py` |
 | Tối ưu cho laptop 4GB VRAM (chạy thật, không phải server) | Dual-mode GPU/CPU (`--cpu`), warmup SLM, guide cài đặt Windows 11 | `laptop-deployment-guide.md` |
 
-**Điểm trung thực (không che):** khoảng cách hiện là scale pixel cố định (±30–50%,
-sai ×1.5–3 ở độ cao bay 30–50m) — từ W2 sang object-height anchor (±15–25%), từ W7
-sang tam giác phân GPS (±10–15%),
-chưa có track ID, chưa hoạt động ban đêm, link đang UDP/WiFi (chưa có VPN),
-cảnh báo im lặng chưa có module rung — đây chính là các mục Phase 5.
+**Điểm trung thực (không che):** khoảng cách: từ W2 sang **object-height anchor**
+(sim 30m: sai 1.2–1.3%; ±15–25% trên dữ liệu thật), từ W7 sang tam giác phân GPS
+(±10–15%); track ID đã ổn định (AC1: 0.0% re-ID/150 khung); cảnh báo im lặng =
+flash <100ms (đã có) — còn: chưa hoạt động ban đêm, link đang UDP/WiFi (chưa có VPN — W5),
+chưa có module rung — đây chính là các mục Phase 5.
 
 ## 5. Kiến trúc (5 nguyên tắc — chi tiết trong báo cáo kiến trúc)
 

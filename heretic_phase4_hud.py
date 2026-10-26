@@ -20,6 +20,8 @@ import time
 import cv2
 import numpy as np
 
+from tactical_height_anchor import (FALLBACK_SCALE, MIN_ANCHOR_BOX_H_PX, SIM_FOV_DEG,
+                                    SIM_UAV_ALT_M, height_anchor_scale, sim_frame_scale)
 from tactical_hud_renderer import WARN_RANGE_M, render_hud
 from tactical_slm import TacticalAlertGater, call_ollama, evaluate_alert
 from tactical_telemetry_feed import TelemetryFeed, is_friendly_by_gps, read_soldier_gps
@@ -27,7 +29,7 @@ from tactical_tracker import TrackStore
 
 FRAME_WIDTH = 1280
 FRAME_HEIGHT = 720
-PIXEL_TO_METER = 0.05  # he so quy doi gia lung (Phase 2): 1 px = 0.05 m
+PIXEL_TO_METER = FALLBACK_SCALE  # fallback m/px; moi box dung object-height anchor
 SOLDIER_GPS = {"lat": 21.0333, "lon": 105.7333, "location": "Tu Liem, Ha Noi"}
 
 
@@ -62,13 +64,15 @@ def build_tactical_data(results, center_x, center_y, scale, model_names, friendl
                         tracker=None, ts=None):
     """List box YOLO -> list {target, track_id, distance_m, bearing, approach_mps, box, side}.
     friendly_fn: ham nhan biet dong doi (None -> het thuc la dich).
-    tracker+ts: TrackStore (Phase 1) — neu co, mo tung track + tinh approach_mps."""
+    tracker+ts: TrackStore (Phase 1) — neu co, mo tung track + tinh approach_mps.
+    scale: fallback m/px; moi box tu do dung object-height anchor (class/box_h)."""
     tactical = []
     for r in results:
         for box in r.boxes:
             class_name = model_names[int(box.cls[0])]
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-            distance, direction = calculate_tactical_telemetry(box, center_x, center_y, scale)
+            box_scale = height_anchor_scale(class_name, y2 - y1, scale)
+            distance, direction = calculate_tactical_telemetry(box, center_x, center_y, box_scale)
             track_id = int(box.id[0]) if box.id is not None else None
             t = {
                 "target": class_name,
@@ -78,7 +82,7 @@ def build_tactical_data(results, center_x, center_y, scale, model_names, friendl
                 "box": (x1, y1, x2, y2),
             }
             if tracker is not None and track_id is not None and ts is not None:
-                tracker.update(track_id, ts, (x1 + x2) / 2, (y1 + y2) / 2, distance, scale)
+                tracker.update(track_id, ts, (x1 + x2) / 2, (y1 + y2) / 2, distance, box_scale)
                 t["approach_mps"] = round(tracker.approach(track_id), 2)
             t["side"] = "friendly" if friendly_fn and friendly_fn(t) else "enemy"
             tactical.append(t)
@@ -115,22 +119,31 @@ def minimap_units_from_feed(feed, soldier_latlon):
     return uav_frac, gps_units
 
 
-def make_sim_frame(distance_m, direction):
-    """Khung hinh hop thanh 1280x720 + mot 'dich' di den gan theo khoang cach."""
+def make_sim_frame(distance_m, direction, alt_m=SIM_UAV_ALT_M, fov_deg=SIM_FOV_DEG):
+    """Khung hinh hop thanh 1280x720 + mot 'dich' (person) di den gan theo khoang cach.
+    Vat ly sim: UAV bay h=alt_m, FOV ngang fov_deg → scale = 2h.tan(FOV/2)/W;
+    chieu cao box nguoi = 1.7m/scale (object-height anchor doc duoc lai tu do).
+    Target xa hon bien khung → gap ve bien khung (kich thuoc box van dung)."""
     frame = np.full((FRAME_HEIGHT, FRAME_WIDTH, 3), (15, 18, 15), dtype=np.uint8)
     for i in range(1, 10):  # luoi nen
         x = FRAME_WIDTH * i // 10
         y = FRAME_HEIGHT * i // 10
         cv2.line(frame, (x, 0), (x, FRAME_HEIGHT), (30, 35, 30), 1)
         cv2.line(frame, (0, y), (FRAME_WIDTH, y), (30, 35, 30), 1)
-    # 'Dich': hinh nguoi don gian, vi tri theo huong + khoang cach (px = m/0.05)
+    scale = sim_frame_scale(FRAME_WIDTH, alt_m, fov_deg)
+    person_h = max(MIN_ANCHOR_BOX_H_PX, int(1.7 / scale))
+    person_w = max(8, int(0.5 / scale))
     cx, cy = FRAME_WIDTH // 2, FRAME_HEIGHT // 2
     px = {"Đông": (1, 0), "Bắc": (0, -1), "Tây": (-1, 0), "Nam": (0, 1)}[direction]
-    dist_px = int(min(distance_m / PIXEL_TO_METER, 620))
-    tx, ty = cx + px[0] * dist_px, cy + px[1] * dist_px
-    cv2.circle(frame, (tx, ty - 40), 18, (60, 60, 60), -1)
-    cv2.rectangle(frame, (tx - 22, ty - 20), (tx + 22, ty + 50), (60, 60, 60), -1)
-    return frame, (tx - 40, ty - 70, tx + 40, ty + 60)
+    tx = cx + px[0] * int(distance_m / scale)
+    ty = cy + px[1] * int(distance_m / scale)
+    tx = max(person_w, min(FRAME_WIDTH - person_w, tx))
+    ty = max(person_h, min(FRAME_HEIGHT - person_h, ty))
+    r_head = max(4, person_w // 3)
+    cv2.circle(frame, (tx, ty - person_h // 2), r_head, (60, 60, 60), -1)
+    cv2.rectangle(frame, (tx - person_w // 2, ty - person_h // 2 + r_head),
+                  (tx + person_w // 2, ty + person_h // 2), (60, 60, 60), -1)
+    return frame, (tx - person_w // 2, ty - person_h // 2, tx + person_w // 2, ty + person_h // 2)
 
 
 def main():
@@ -173,6 +186,7 @@ def main():
 
     if args.sim:
         sim_box = None
+        flash_left = 0
         print("[SIM] HUD hop thanh: binh lanh tiep can huong Tay 95m -> 1m")
         for distance in [95, 90, 85, 75, 65, 55, 45, 35, 25, 15, 9, 8, 7, 5, 3, 1]:
             frame, sim_box = make_sim_frame(distance, "Tây")
@@ -181,8 +195,10 @@ def main():
             t["side"] = "friendly" if friendly_fn and friendly_fn(t) else "enemy"
             tactical = [t]
             alert = evaluate_alert(enemies_payload(tactical), gater, use_slm=args.slm)
+            flash_left = 3 if alert else max(0, flash_left - 1)  # flash 3 khung
             uav_frac, gps_units = minimap_units_from_feed(feed, soldier_latlon)
-            out = render_hud(frame, tactical, alert, time.time(), uav_frac, gps_units)
+            out = render_hud(frame, tactical, alert, time.time(), uav_frac, gps_units,
+                             flash=flash_left > 0)
             tag = "alert" if alert else "quiet"
             path = f"sim_hud_{distance}m_{tag}.png"
             cv2.imwrite(path, out)
@@ -211,6 +227,7 @@ def main():
     print("🔥 [HERETIC C - PHASE 4] HUD san sang. Bam 'q' de thoat.")
 
     yolo_device = "cpu" if args.cpu else None
+    flash_left = 0
     while cap.isOpened():
         success, frame = cap.read()
         if not success:
@@ -221,9 +238,11 @@ def main():
                                        friendly_fn, tracker=tracker, ts=time.time())
         tracker.prune()
         alert = evaluate_alert(enemies_payload(tactical), gater, use_slm=args.slm)
+        flash_left = 3 if alert else max(0, flash_left - 1)  # flash 3 khung (~100ms @30fps, khong am)
         uav_frac, gps_units = minimap_units_from_feed(feed, soldier_latlon)
         cv2.imshow("Heretic Tactical HUD - Phase 4",
-                   render_hud(frame, tactical, alert, time.time(), uav_frac, gps_units))
+                   render_hud(frame, tactical, alert, time.time(), uav_frac, gps_units,
+                              flash=flash_left > 0))
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 

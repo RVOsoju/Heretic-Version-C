@@ -12,6 +12,7 @@ import sys
 import time
 
 import cv2
+import numpy as np
 
 from heretic_phase4_hud import enemies_payload, make_sim_frame, minimap_units_from_feed
 from tactical_hud_renderer import render_hud
@@ -98,6 +99,41 @@ def main():
           a1 is not None and a1.startswith("CẢNH BÁO:"))
     a2 = evaluate_alert(payload, g)
     check("template 95m lan 2 (chua giam 10m) -> im lang", a2 is None)
+
+    # AC3: gater theo track_id — cut nguong 100m mot lan = dung 1 canh bao
+    g3 = TacticalAlertGater()
+    p3 = {"soldier_gps": {"lat": slat, "lon": slon},
+          "detected_threats": [{"target": "person", "distance_m": 105.0,
+                                "bearing": "Tây", "track_id": 7}]}
+    check("AC3 105m (chua qua nguong 100m) -> im lang", evaluate_alert(p3, g3) is None)
+    p3["detected_threats"][0]["distance_m"] = 95.0
+    a3 = evaluate_alert(p3, g3)
+    check("AC3 95m cung track (cut nguong 1 lan) -> 1 canh bao",
+          a3 is not None and "95m" in a3, f"({a3})")
+    check("AC3 95m lap (chua giam 10m) -> im lang", evaluate_alert(p3, g3) is None)
+    # 3 target -> chon gan nhat
+    g4 = TacticalAlertGater()
+    p_multi = {"soldier_gps": {"lat": slat, "lon": slon},
+               "detected_threats": [
+                   {"target": "person", "distance_m": 95.0,
+                    "bearing": "Tây", "track_id": 1},
+                   {"target": "person", "distance_m": 42.0,
+                    "bearing": "Đông", "track_id": 2},
+                   {"target": "car", "distance_m": 60.0,
+                    "bearing": "Bắc", "track_id": 3}]}
+    a4 = evaluate_alert(p_multi, g4)
+    check("AC3 3 target -> chon gan nhat (42m)", a4 is not None and "42m" in a4,
+          f"({a4})")
+
+    # AC4: canh bao im lang — flash overlay toan man hinh, khong am thanh
+    f0, _b0 = make_sim_frame(5, "Tây")
+    base = render_hud(f0, [t], "CẢNH BÁO: test", 1.0, uav_frac, gps_units,
+                      flash=False)
+    f1, _b1 = make_sim_frame(5, "Tây")
+    flashed = render_hud(f1, [t], "CẢNH BÁO: test", 1.0, uav_frac, gps_units,
+                         flash=True)
+    # ~100ms = 3 khung @30fps (flash_left = 3 trong heretic_phase4_hud.py)
+    check("AC4 flash overlay thay doi frame", not np.array_equal(base, flashed))
 
     tx.close()
     feed.stop()

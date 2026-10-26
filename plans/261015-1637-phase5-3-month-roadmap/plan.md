@@ -33,7 +33,7 @@ không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ 
 | Tuần | Ngày | Deliverable | Verify |
 |------|------|-------------|--------|
 | **W1 ✓** | 19/10–25/10 | **✓ DONE 19/10 (W1d1–d5):** baseline 11/11 + 16 khung; ByteTrack (`model.track`, bytetrack.yaml) + `TrackStore` (velocity/approach/prune) + gater re-key `track_id` (fallback cũ) + `test_360p_precision.py` (360P tổng hợp) | ✓ `boxes.id` ổn định 30 khung (0 re-ID), overhead **1.5ms <5ms**; precision 360P **P 0.74/R 0.79** → B6 |
-| **W2** | 26/10–01/11 | Velocity + approach speed; **object-height anchor** (scale tự hiệu chuẩn theo chiều cao box — thay constant 0.05 sai ×1.5–3 ở 30–50m); **flash HUD <100ms không âm (AC4)**; gater re-key theo `track_id`; `test_tracking.py` → **M1 done** | AC1: re-ID <5%/100 khung · AC2: sai vận tốc <10% (scale anchor, distance sim 30m sai <25%) · AC3: cắt ngưỡng 100m 1 lần → báo đúng 1 lần · AC4: flash <100ms |
+| **W2 ✓** | 26/10–01/11 | **✓ DONE 26/10 (W2d1–d5):** object-height anchor (`tactical_height_anchor.py` — scale/class + fallback 0.05, `make_sim_frame` vật lý 30m/FOV60°) + flash HUD (3 khung @30fps, không âm) + `test_tracking.py` (150 khung, YOLO26n + ByteTrack thật) + AC3 vào `test_telemetry_chain.py` → **M1 done** | ✓ AC1: 150/150 khung, re-ID **0.0%** · AC2: 2.32 vs 2.29 m/s (**sai 1.2%**) · anchor 1.2–1.3% (<25%) · AC3: 105→95m cùng track = 1 cảnh báo, 3 target → chọn 42m · AC4: flash ≈100ms · 20/20 + 7/7 checks PASS |
 | **W3** | 02/11–08/11 | Tải MVRSD (verify Baidu; fallback AMAD/InvictusRex) + **VisDrone** (góc drone: person + 4 xe); **verify tham số thu** (độ cao/tốc độ/FOV) từ dataset card; prep data, map 8 class; **research nguồn `soldier`** (B9 — ưu tiên footage UAV tự quay) | `mvrsd-8c.yaml` hợp lệ, 3000 ảnh trên server; VisDrone subset 5 class; **tham số thu UAV ghi vào report**; B9 có kết quả |
 | **W4** | 09/11–15/11 | Fine-tune yolo26n → 8 class (MVRSD + **VisDrone** + `soldier` + COCO regression) + regression check → **M2 done** | `yolo val` mAP50 ≥0.75 (val MVRSD+VisDrone); mAP 6 class COCO giảm ≤5 điểm; tham số thu UAV ghi báo cáo (AC7) |
 | **W5** | 16/11–22/11 | **Sim-first**: dựng bench 2 node (laptop + node 2) + WireGuard, `udp_position_sender.py` — không phụ thuộc UAV | `wg show` 2 peer active; ping <20ms; `test_vpn_link.py` PASS (AC5 phần bench) |
@@ -104,7 +104,7 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Tracking and gater track_id](./phase-01-tracking-and-gater-track-id.md) | In progress (W1 ✓ 19/10, còn W2) |
+| 1 | [Tracking and gater track_id](./phase-01-tracking-and-gater-track-id.md) | **Done** (W1 ✓ 19/10, W2 ✓ 26/10 — AC1–AC4 + anchor; còn item UAV về tay trước W9 = B1–B3) |
 | 2 | [YOLO 8-class fine-tune MVRSD](./phase-02-yolo-8-class-fine-tune-mvrsd.md) | Pending |
 | 3 | [Private network VPN and 360P camera](./phase-03-private-network-vpn-and-360p-camera.md) | Pending |
 | 4 | [FOV patrol and integration](./phase-04-fov-patrol-and-integration.md) | Pending |
@@ -300,3 +300,29 @@ GOTO/waypoint) → patrol/follow mode đầy đủ, verify khi nhận máy; i1 P
 PDR (header, giả định, S4, S6, AC8, risks, open Q1/Q2/Q6) · briefing (header, §1, §6, §7, §8).
 **Còn mở:** ngày mua Mini 2 SE (cần về trước W9); đo FOV/alt + verify virtual port (B1/B2
 khi nhận máy); 5 câu spec i1 Pro (GPS/app/tilt/trần bay/pin) — giảm độ ưu tiên vì chỉ chim tập.
+
+### Session 9 — 2026-10-26 (W2 done: object-height anchor + flash AC4 + test_tracking AC1/AC2/AC3 → M1 done)
+
+**Bối cảnh:** đầu W2 (26/10) — user: "xong W2 đã, nếu chiều chưa xong thì song song W3".
+**Verify (đo thật, không mock):**
+- **W2d1 anchor:** `tactical_height_anchor.py` — scale = kích thước class / box_h, fallback
+  0.05 (class thiếu hoặc box_h <8px); `make_sim_frame` vật lý 30m/FOV60° (scale 0.02706 m/px,
+  người 62px). Frame tổng hợp 15m/10m → anchor sai **1.2–1.3%** (ngưỡng <25%; constant 0.05
+  cũ sai ×1.92 trên cùng frame).
+- **AC4 flash:** `render_hud(flash=)` overlay đỏ toàn màn, 3 khung @30fps ≈ 100ms, không API
+  âm thanh (grep verify). `sim_hud_90m_quiet.png` đỏ = frame 2/3 decay sau alert 95m.
+- **AC1/AC2 (`test_tracking.py` mới):** 150 khung 30fps, person 62px (crop bus.jpg) đi
+  1100→680px, YOLO26n + ByteTrack thật @imgsz=1280 → detection **150/150**, re-ID **0.0%**,
+  approach **2.32 vs gt 2.29 m/s (sai 1.2%)**.
+- **AC3 (`test_telemetry_chain.py` +6 checks = 20):** 105m→95m cùng track_id = đúng 1 cảnh
+  báo, 95m lặp = im lặng; 3 target 95/42/60m → chọn **42m**.
+- `--sim` 16/16 khung, gater nhịp 10m/1m đúng.
+**Issues fix sau code-review (0 BLOCKER/MAJOR, 3 MINOR):** `full_track_approach` đọc cục bộ
+`detections` thay vì `store.tracks` (cửa sổ 5 khung — tên không đúng nội dung); bỏ check
+tautological `3/30 <= 0.1`; strip tham chiếu plan (W2/AC4) khỏi comment code (test giữ AC
+cho traceability).
+**Impact:** `tactical_height_anchor.py` (mới) · `heretic_phase4_hud.py` (per-box anchor,
+sim vật lý, flash) · `tactical_hud_renderer.py` (flash param) · `test_tracking.py` (mới,
+7 checks) · `test_telemetry_chain.py` (20 checks) · phase-01 **completed** · plan.md W2 ✓.
+**Còn mở W3 (02/11):** MVRSD (test Baidu = B5) + VisDrone download trên server; W4 gate
+mAP50 ≥0.75 → 26s fallback (26l loại — VRAM 4GB).

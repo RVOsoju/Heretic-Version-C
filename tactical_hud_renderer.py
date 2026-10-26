@@ -12,6 +12,7 @@ Thanh phan HUD:
 """
 
 import cv2
+import numpy as np
 
 # Mau sac BGR
 RED = (0, 0, 255)        # dich
@@ -126,10 +127,13 @@ def draw_alert_bar(frame, text, blink_on):
         _text(frame, body, ((w - tw) // 2, y0 + bar_h // 2 + th // 2), fg, 0.8, 2)
 
 
-def render_hud(frame, tactical_data, alert_text, now, uav_frac=(0.15, 0.18), gps_units=()):
+def render_hud(frame, tactical_data, alert_text, now, uav_frac=(0.15, 0.18), gps_units=(),
+               flash=False):
     """Gop toan bo HUD len khung hinh. tactical_data: list {target, distance_m,
     bearing}. alert_text: cau SLM hoac None. now: thoi diem (s) cho nhap chop.
-    uav_frac: vi tri UAV tren minimap (tu feed GPS). gps_units: don doi theo GPS thuc."""
+    uav_frac: vi tri UAV tren minimap (tu feed GPS). gps_units: don doi theo GPS thuc.
+    flash: canh bao im leng — overlay do toan man hinh, khong am thanh,
+    ~100ms (3 khung @30fps)."""
     h, w = frame.shape[:2]
 
     draw_soldier_marker(frame, w // 2, h // 2)
@@ -149,4 +153,7 @@ def render_hud(frame, tactical_data, alert_text, now, uav_frac=(0.15, 0.18), gps
 
     blink_on = int(now * 2) % 2 == 0  # nhap 2Hz: 0.25s bat - 0.25s tat
     draw_alert_bar(frame, alert_text, blink_on)
+    if flash:
+        overlay = np.full_like(frame, (0, 0, 255))
+        frame = cv2.addWeighted(frame, 0.55, overlay, 0.45, 0)
     return frame
