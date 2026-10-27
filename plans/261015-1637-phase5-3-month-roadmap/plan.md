@@ -34,8 +34,8 @@ không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ 
 |------|------|-------------|--------|
 | **W1 ✓** | 19/10–25/10 | **✓ DONE 19/10 (W1d1–d5):** baseline 11/11 + 16 khung; ByteTrack (`model.track`, bytetrack.yaml) + `TrackStore` (velocity/approach/prune) + gater re-key `track_id` (fallback cũ) + `test_360p_precision.py` (360P tổng hợp) | ✓ `boxes.id` ổn định 30 khung (0 re-ID), overhead **1.5ms <5ms**; precision 360P **P 0.74/R 0.79** → B6 |
 | **W2 ✓** | 26/10–01/11 | **✓ DONE 26/10 (W2d1–d5):** object-height anchor (`tactical_height_anchor.py` — scale/class + fallback 0.05, `make_sim_frame` vật lý 30m/FOV60°) + flash HUD (3 khung @30fps, không âm) + `test_tracking.py` (150 khung, YOLO26n + ByteTrack thật) + AC3 vào `test_telemetry_chain.py` → **M1 done** | ✓ AC1: 150/150 khung, re-ID **0.0%** · AC2: 2.32 vs 2.29 m/s (**sai 1.2%**) · anchor 1.2–1.3% (<25%) · AC3: 105→95m cùng track = 1 cảnh báo, 3 target → chọn 42m · AC4: flash ≈100ms · 20/20 + 7/7 checks PASS |
-| **W3** | 02/11–08/11 | Tải MVRSD (verify Baidu; fallback AMAD/InvictusRex) + **VisDrone** (góc drone: person + 4 xe); **verify tham số thu** (độ cao/tốc độ/FOV) từ dataset card; prep data, map 8 class; **research nguồn `soldier`** (B9 — ưu tiên footage UAV tự quay) | `mvrsd-8c.yaml` hợp lệ, 3000 ảnh trên server; VisDrone subset 5 class; **tham số thu UAV ghi vào report**; B9 có kết quả |
-| **W4** | 09/11–15/11 | Fine-tune yolo26n → 8 class (MVRSD + **VisDrone** + `soldier` + COCO regression) + regression check → **M2 done** | `yolo val` mAP50 ≥0.75 (val MVRSD+VisDrone); mAP 6 class COCO giảm ≤5 điểm; tham số thu UAV ghi báo cáo (AC7) |
+| **W3** | 02/11–08/11 | Tải MVRSD (verify Baidu; fallback AMAD/InvictusRex) + **VisDrone** (góc drone: person + 4 xe); **verify tham số thu** (độ cao/tốc độ/FOV) từ dataset card; prep data, map 8 class; **verify dataset `soldier`** (B9: Mendeley ~8k bird's-eye YOLO format + Roboflow ~4.8k — user tìm 26/10; footage i1 Pro = bonus) | `mvrsd-8c.yaml` hợp lệ, 3000 ảnh trên server; VisDrone subset 5 class; **tham số thu UAV ghi vào report**; B9 đóng (license + chất lượng label verify) |
+| **W4** | 09/11–15/11 | Fine-tune yolo26n → 8 class (MVRSD + **VisDrone** + `soldier` + COCO regression) + regression check → **M2 done** | `yolo val` mAP50 ≥0.75 (val MVRSD+VisDrone); mAP 6 class COCO giảm ≤5 điểm; tham số thu UAV ghi báo cáo (AC7) · **gate: nếu mAP50 <0.75 → yolo26s + bench VRAM trên laptop (26l loại — 4GB)** |
 | **W5** | 16/11–22/11 | **Sim-first**: dựng bench 2 node (laptop + node 2) + WireGuard, `udp_position_sender.py` — không phụ thuộc UAV | `wg show` 2 peer active; ping <20ms; `test_vpn_link.py` PASS (AC5 phần bench) |
 | **W6** | 23/11–29/11 | Video source abstraction (`--source webcam/rtsp/uvc/file`); hiệu chỉnh YOLO cho 360P → **M3 done** | ≥15fps @360P; người trong khung → cảnh báo <2s (nửa AC8) |
 | **W7** | 30/11–06/12 | Cone FOV trên minimap + **badge target trong/ngoài tầm nhìn** + tuần tra + **chế độ follow target** (MAVLink qua DJI Virtual Port nếu verify OK, nếu không = route gợi ý tay + HUD chỉ hướng) + **tam giác phân GPS** (`tactical_geolocation.py`: pose UAV + pixel → lat/lon target; `alt` vào payload UDP; đo FOV → B1) | `--sim` lộ trình waypoint: cone đúng hướng, **UAV bay theo vị trí mục tiêu**, **khoảng cách target→lính sai <15%** so ground truth (AC6 sim) |
@@ -82,7 +82,7 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 | B5 | **MVRSD qua Baidu pan** — server có truy cập không? | Trễ 1 tuần W3 → W4 trôi | W3 (ngày 1) | Test tải 1 file trên server; fallback AMAD / InvictusRex (GitHub release) |
 | B6 | **Chất lượng 360P** (người 20m ≈ 40–60px) | Detection rớt → phải tune imgsz/NMS ở W6 | W1 (video tổng hợp); retest frame thật khi UAV về | **W1d5 ✓ (19/10):** `test_360p_precision.py` — 30 frame 640×360 (bus.jpg pan): **P 0.74 / R 0.79** (conf ≥0.25, person ~170px) — người to; khi bay thật (i1 Pro / Mini 2 SE) retest frame thật (người 16–40px) mới là dữ liệu quyết định |
 | B7 | **SIM 4G** có sẵn không | Không có → chỉ WiFi (tầm ngắn), demo phải trong vùng phủ AP | W5 | Kiểm tra kho; không ảnh hưởng kiến trúc (4G là uplink dự phòng) |
-| B9 | **Nguồn ảnh class `soldier`** (dataset mở hay tự ghi footage thao trường?) | Không có → không fine-tune được class `soldier` (chỉ còn `person`) | W3d3 | Research dataset mở (GitHub); phương án dự phòng: tự ghi + label footage thao trường (cần đồng ý); nếu không có → escalate giảng viên (giữ 7 class) |
+| B9 | **Nguồn ảnh class `soldier`** — user đã tìm 26/10: **Mendeley ~8k** (bird's-eye, YOLO format, Soldier/Drone/Tank/People, label CVAT→YOLO .txt — `data.mendeley.com/datasets/9z7yrcrpjk`) + **Roboflow ~4.8k** (backup, v1, export YOLOv8/v11 — `universe.roboflow.com/1-ukcc8/uav-tank-soldier-cjbmf`) | Verify fail (license/chất lượng label) → không fine-tune được `soldier` (chỉ còn `person`) | W3d3 | Download trên server (2 link trên) + verify license + spot-check 50–100 label + tham số thu (Mendeley card: bird's-eye/altitude variation, **không ghi số cố định** — ghi nhận vào report); map Soldier→soldier, Tank→military_vehicle, People→person, Drone→loại; backup: footage i1 Pro tự quay (bonus domain-adapt); nếu cả 3 fail → escalate giảng viên (giữ 7 class) |
 
 ## KPI (acceptance criteria — PDR §5)
 
@@ -125,7 +125,7 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 2. **DJI Virtual Port** (Mini 2 SE) có GOTO/waypoint ổn định không (tuần tra tự động)? → verify khi nhận máy → variant A/B tuần tra W7.
 3. Có sẵn **SIM 4G/data** nào không? → nếu không: chỉ WiFi riêng (demo trong vùng phủ AP).
 4. Module rung (haptic) có được cấp thêm sau này không? → giữ blocked; AC4 fallback flash + SLM.
-5. **Nguồn ảnh class `soldier`** (B9) — dataset mở hay tự ghi footage thao trường? → research W3, chốt trước train W4.
+5. **Nguồn ảnh class `soldier`** (B9) — user đã tìm 26/10: Mendeley ~8k (bird's-eye, YOLO format) + Roboflow ~4.8k → verify license + chất lượng label + tham số thu W3d3; footage i1 Pro = bonus domain-adapt (không còn nguồn chính).
 6. Alt + góc gimbal — Mini 2 SE: **có áp kế + đọc góc gimbal trong app** ✓ (23/10) → input tam giác phân GPS (W7); verify số liệu thực khi nhận máy.
 
 ## Validation Log
@@ -326,3 +326,25 @@ sim vật lý, flash) · `tactical_hud_renderer.py` (flash param) · `test_track
 7 checks) · `test_telemetry_chain.py` (20 checks) · phase-01 **completed** · plan.md W2 ✓.
 **Còn mở W3 (02/11):** MVRSD (test Baidu = B5) + VisDrone download trên server; W4 gate
 mAP50 ≥0.75 → 26s fallback (26l loại — VRAM 4GB).
+
+### Session 10 — 2026-10-26 (B9: nguồn dataset `soldier` do user tìm — Mendeley + Roboflow)
+
+**Bối cảnh:** user đưa 5 dataset tìm được (Mendeley Multi-Class UAV Military ~8k bird's-eye
+YOLO format Soldier/Drone/Tank/People; Roboflow UAV-tank-soldier ~4.8k; UAV-CPD camouflage;
+KIIT-MiTA thermal/night; Simuletic commercial 3D) hỏi có dùng được cho train YOLO26 không.
+**Đánh giá:**
+- ✅ **Mendeley ~8k = primary B9** — bird's-eye + YOLO format đúng 8 class, Soldier→soldier,
+  Tank→military_vehicle, People→person (bonus), Drone→**loại** (PDR: loại máy bay).
+- ✅ **Roboflow ~4.8k = backup** — export YOLOv8/v11, cùng domain.
+- ❌ **UAV-CPD** (camouflage, ngoài kịch bản) · **KIIT-MiTA** (thermal/night = Phase 6) ·
+  **Simuletic** (commercial 3D, 0 VND).
+**Quyết định:** B9 chuyển từ "research mở" → **verify 2 nguồn cụ thể W3d3** (download + license
++ spot-check 50–100 label + tham số thu: độ cao/FOV/resolution). Footage i1 Pro tự quay hạ
+thành **bonus domain-adapt** (không còn là nguồn chính). Fallback escalate 7 class giữ nguyên
+nếu cả 2 nguồn verify fail.
+**Impact:** plan.md W3 row + B9 register + open Q5 · PDR header + S5 soldier row + open Q5 ·
+briefing §3 dataset table soldier row.
+**Links (user gửi 26/10 14:55):** Mendeley `data.mendeley.com/datasets/9z7yrcrpjk` (label CVAT→YOLO
+.txt; card ghi bird's-eye + altitude variation, **không có số cố định** độ cao/FOV) · Roboflow
+`universe.roboflow.com/1-ukcc8/uav-tank-soldier-cjbmf` (v1, export YOLOv8/v11).
+**Còn mở:** verify thật trên server W3d3 (WebSearch API lỗi 400 — không verify link live được).

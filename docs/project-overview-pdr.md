@@ -1,7 +1,7 @@
 # PDR — Heretic Version C: Target, Scope & Acceptance Criteria
 
 **Dự án:** HUD chiến thuật cho lính — YOLO + cảnh báo tiếng Việt (template + SLM Ollama optional) + HUD + telemetry UAV
-**Ngày:** 2026-10-07 · **Cập nhật:** 2026-10-26 (W2 xong → **M1 done**: object-height anchor — sim 30m sai 1.2–1.3%; flash HUD 3 khung @30fps (AC4); AC1 re-ID 0.0%/150 khung; AC2 vận tốc sai 1.2%; AC3 1 cảnh báo/ngưỡng — `test_tracking.py` 7/7 + telemetry 20/20) · 2026-10-23 (UAV demo: **i1 Pro** đã có (chim tập) + **DJI Mini 2 SE** (demo chính — GPS + áp kế + gimbal 1080P, user mua riêng); downlink = WiFi → app phone → scrcp; W7 tam giác phân GPS giữ nguyên) · 2026-10-19 (kênh câu chữ: **template là chính** (0ms, 0 VRAM) + **SLM optional** `--slm` — giải phóng ~2GB VRAM, không phụ thuộc Ollama) · 2026-10-16 (feedback giảng viên: **dataset góc UAV** + **UAV theo dõi mục tiêu** + **FOV indicator** + **khoảng cách target→lính = tam giác phân GPS** (W7) + **object-height anchor** (W2) — UAV bay vòng quanh lính, không bay trên đầu; 2026-10-15: không tài trợ, mạng riêng WiFi/4G+VPN, UAV được cấp 360P+ — **chưa rõ ngày về**, 8 class chốt: person/soldier + 5 xe thường + military_vehicle)
+**Ngày:** 2026-10-07 · **Cập nhật:** 2026-10-26 (W2 xong → **M1 done**: object-height anchor — sim 30m sai 1.2–1.3%; flash HUD 3 khung @30fps (AC4); AC1 re-ID 0.0%/150 khung; AC2 vận tốc sai 1.2%; AC3 1 cảnh báo/ngưỡng — `test_tracking.py` 7/7 + telemetry 20/20) · **B9 (nguồn `soldier`) có 2 nguồn cụ thể do user tìm 26/10: Mendeley ~8k (bird's-eye, YOLO format) + Roboflow ~4.8k — verify W3d3 (license + spot-check label + tham số thu)** · 2026-10-23 (UAV demo: **i1 Pro** đã có (chim tập) + **DJI Mini 2 SE** (demo chính — GPS + áp kế + gimbal 1080P, user mua riêng); downlink = WiFi → app phone → scrcp; W7 tam giác phân GPS giữ nguyên) · 2026-10-19 (kênh câu chữ: **template là chính** (0ms, 0 VRAM) + **SLM optional** `--slm` — giải phóng ~2GB VRAM, không phụ thuộc Ollama) · 2026-10-16 (feedback giảng viên: **dataset góc UAV** + **UAV theo dõi mục tiêu** + **FOV indicator** + **khoảng cách target→lính = tam giác phân GPS** (W7) + **object-height anchor** (W2) — UAV bay vòng quanh lính, không bay trên đầu; 2026-10-15: không tài trợ, mạng riêng WiFi/4G+VPN, UAV được cấp 360P+ — **chưa rõ ngày về**, 8 class chốt: person/soldier + 5 xe thường + military_vehicle)
 **Runtime target:** Asus TUF F15 FX507 — RTX 3050 (4GB VRAM), i7-12700H, 16GB DDR4, **Windows 11**
 **Kịch bản:** 1 lính + 1 UAV. Phi sát thương — chỉ phát hiện + cảnh báo, không vũ khí tự động.
 
@@ -54,7 +54,7 @@ chưa chạy được đủ AC1–AC11 (AC4 = chế độ fallback hình ảnh c
 |-------|------------|----------|---------|
 | `military_vehicle` | MVRSD (~3000 ảnh, gộp mọi label xe QS) | Drone/satellite | Verify độ cao thu từ dataset card (W3) |
 | `person, car, motorcycle, truck, bus` | **VisDrone** (drone) + COCO subset (chống regression) | Drone (VisDrone) | Đáp ứng "dataset thu từ UAV" |
-| `soldier` | B9: **footage UAV thật tự quay (ưu tiên)** / dataset mở | UAV thật (30–50m, 3–5 m/s) | Chốt W3d3; không có → escalate (7 class) |
+| `soldier` | **B9: dataset mở góc UAV — Mendeley ~8k (bird's-eye, YOLO format) + Roboflow ~4.8k** (user tìm 26/10); footage UAV thật tự quay (i1 Pro) = bonus domain-adapt | Drone/bird's-eye | **Verify W3d3** (license + spot-check 50–100 label + tham số thu: độ cao/FOV/resolution); mapping Soldier→soldier, Tank→military_vehicle, People→person, Drone→loại; không có → escalate (7 class) |
 | `boat` | COCO (giữ, ít fine-tune) | Đường phố | Ít gặp ở kịch bản UAV |
 
 **Tham số thu UAV** (ghi trong báo cáo đồ án): độ cao 30–50m, tốc độ 3–5 m/s, camera hướng
@@ -146,5 +146,5 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 2. **DJI Virtual Port** (Mini 2 SE) có GOTO/waypoint ổn định không (tuần tra tự động)? → verify khi nhận máy; fallback bay tay theo route gợi ý.
 3. Có sẵn **SIM 4G/data** nào không (nếu không → chỉ dùng WiFi riêng)?
 4. Module rung (haptic) có được cấp thêm sau này không?
-5. **Nguồn ảnh class `soldier`** (B9) — dataset mở hay tự ghi footage thao trường? → research W3, chốt trước train W4.
+5. **Nguồn ảnh class `soldier`** (B9) — **đã có 2 nguồn cụ thể (user tìm 26/10): Mendeley ~8k + Roboflow ~4.8k** → verify W3d3 (license + spot-check label + tham số thu) trước train W4; footage i1 Pro tự quay = bonus domain-adapt.
 6. Alt + góc gimbal — Mini 2 SE: **có áp kế + đọc góc gimbal trong app** (23/10) → input tam giác phân GPS (W7); verify số liệu thực khi nhận máy.

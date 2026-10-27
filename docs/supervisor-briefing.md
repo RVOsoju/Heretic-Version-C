@@ -53,7 +53,7 @@ UAV bay quanh vị trí người được bảo vệ và **bay theo mục tiêu 
 |-------|------|----------|
 | `military_vehicle` | MVRSD ~3000 ảnh | Drone/satellite (độ cao thu ghi trong báo cáo) |
 | `person, car, motorcycle, truck, bus` | **VisDrone** (dataset drone) + COCO subset | Drone |
-| `soldier` | Footage UAV thật tự quay / dataset mở | **UAV thật** |
+| `soldier` | **Mendeley ~8k (bird's-eye, YOLO format) + Roboflow ~4.8k** (user tìm 26/10) + footage i1 Pro (bonus) | **Drone/bird's-eye** |
 
 Tham số thu (ghi trong báo cáo đồ án): **độ cao 30–50m, tốc độ 3–5 m/s, camera hướng
 xuống/tilt trước, target 10–50m ≈ 20–60 px**.
