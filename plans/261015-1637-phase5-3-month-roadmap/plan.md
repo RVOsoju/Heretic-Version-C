@@ -34,7 +34,7 @@ không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ 
 |------|------|-------------|--------|
 | **W1 ✓** | 19/10–25/10 | **✓ DONE 19/10 (W1d1–d5):** baseline 11/11 + 16 khung; ByteTrack (`model.track`, bytetrack.yaml) + `TrackStore` (velocity/approach/prune) + gater re-key `track_id` (fallback cũ) + `test_360p_precision.py` (360P tổng hợp) | ✓ `boxes.id` ổn định 30 khung (0 re-ID), overhead **1.5ms <5ms**; precision 360P **P 0.74/R 0.79** → B6 |
 | **W2 ✓** | 26/10–01/11 | **✓ DONE 26/10 (W2d1–d5):** object-height anchor (`tactical_height_anchor.py` — scale/class + fallback 0.05, `make_sim_frame` vật lý 30m/FOV60°) + flash HUD (3 khung @30fps, không âm) + `test_tracking.py` (150 khung, YOLO26n + ByteTrack thật) + AC3 vào `test_telemetry_chain.py` → **M1 done** | ✓ AC1: 150/150 khung, re-ID **0.0%** · AC2: 2.32 vs 2.29 m/s (**sai 1.2%**) · anchor 1.2–1.3% (<25%) · AC3: 105→95m cùng track = 1 cảnh báo, 3 target → chọn 42m · AC4: flash ≈100ms · 20/20 + 7/7 checks PASS |
-| **W3** | 02/11–08/11 | Tải MVRSD (verify Baidu; fallback AMAD/InvictusRex) + **VisDrone** (góc drone: person + 4 xe); **verify tham số thu** (độ cao/tốc độ/FOV) từ dataset card; prep data, map 8 class; **verify dataset `soldier`** (B9: Mendeley ~8k bird's-eye YOLO format + Roboflow ~4.8k — user tìm 26/10; footage i1 Pro = bonus) | `mvrsd-8c.yaml` hợp lệ, 3000 ảnh trên server; VisDrone subset 5 class; **tham số thu UAV ghi vào report**; B9 đóng (license + chất lượng label verify) |
+| **W3** | 02/11–08/11 | **✓ Prep data XONG SỚM 27–28/10:** MVRSD 13,582 ảnh (mirror InvictusRex → **B5 đóng**) + VisDrone 9,209 ảnh có label + Mendeley 7,985 ảnh (fix 782 label thiếu newline) + **COCO boat 3,025 ảnh (cat_id 9, `prepare_coco_boat_subset.py`)** — tải + verify hết; **heretic-8c hợp nhất: 33,221 ảnh, 8 class đầy đủ** (`prepare_heretic_8c_dataset.py`, visual check 6/6); B9-Mendeley verify xong (CC BY 4.0, spot-check + render) | `heretic-8c.yaml` hợp lệ 33,221 ảnh, 0 malformed, boat = 10,576 boxes ✓ 28/10; còn: **tham số thu UAV ghi báo cáo**; Roboflow backup (token, không block) |
 | **W4** | 09/11–15/11 | Fine-tune yolo26n → 8 class (MVRSD + **VisDrone** + `soldier` + COCO regression) + regression check → **M2 done** | `yolo val` mAP50 ≥0.75 (val MVRSD+VisDrone); mAP 6 class COCO giảm ≤5 điểm; tham số thu UAV ghi báo cáo (AC7) · **gate: nếu mAP50 <0.75 → yolo26s + bench VRAM trên laptop (26l loại — 4GB)** |
 | **W5** | 16/11–22/11 | **Sim-first**: dựng bench 2 node (laptop + node 2) + WireGuard, `udp_position_sender.py` — không phụ thuộc UAV | `wg show` 2 peer active; ping <20ms; `test_vpn_link.py` PASS (AC5 phần bench) |
 | **W6** | 23/11–29/11 | Video source abstraction (`--source webcam/rtsp/uvc/file`); hiệu chỉnh YOLO cho 360P → **M3 done** | ≥15fps @360P; người trong khung → cảnh báo <2s (nửa AC8) |
@@ -79,10 +79,10 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 | B2 | **MAVLink/GCS** — Mini 2 SE: **DJI Virtual Port** (MAVLink tập hợp giới hạn: telemetry + GOTO/waypoint) — verify thực | W7: upload waypoint tự động (variant A) vs bay tay theo route gợi ý (variant B — build trước) | **Khi Mini 2 SE về tay + 1 tuần** | DJI Assistant/virtual port + QGroundControl; i1 Pro: không MAVLink (chỉ chim tập) |
 | B3 | **Vị trí UAV** — Mini 2 SE: **có GPS + áp kế** ✓ (spec 23/10); i1 Pro: không GPS (chỉ chim tập) | W7 tam giác phân GPS khả thi với Mini 2 SE | **Đóng khi Mini 2 SE về tay** (verify GPS lock + alt) | i1 Pro không block gì (chỉ tập bay + test scrcp bridge) |
 | B4 | Node ESP32+NEO-6M trong BOM **chưa mua** (`hardware-bom.md` ghi "chưa mua") | Không có node GPS vật lý → demo dùng `--soldier-gps` + đồng đội mô phỏng | W1 | Đếm kho; nếu không có → dùng đường sim (code đã hỗ trợ) |
-| B5 | **MVRSD qua Baidu pan** — server có truy cập không? | Trễ 1 tuần W3 → W4 trôi | W3 (ngày 1) | Test tải 1 file trên server; fallback AMAD / InvictusRex (GitHub release) |
+| B5 | **MVRSD qua Baidu pan** — server có truy cập không? | — | **✓ ĐÓNG 27/10** | MVRSD đã tải qua **mirror InvictusRex (GitHub LFS)** — không cần Baidu; 13,582 ảnh verify YOLO format |
 | B6 | **Chất lượng 360P** (người 20m ≈ 40–60px) | Detection rớt → phải tune imgsz/NMS ở W6 | W1 (video tổng hợp); retest frame thật khi UAV về | **W1d5 ✓ (19/10):** `test_360p_precision.py` — 30 frame 640×360 (bus.jpg pan): **P 0.74 / R 0.79** (conf ≥0.25, person ~170px) — người to; khi bay thật (i1 Pro / Mini 2 SE) retest frame thật (người 16–40px) mới là dữ liệu quyết định |
 | B7 | **SIM 4G** có sẵn không | Không có → chỉ WiFi (tầm ngắn), demo phải trong vùng phủ AP | W5 | Kiểm tra kho; không ảnh hưởng kiến trúc (4G là uplink dự phòng) |
-| B9 | **Nguồn ảnh class `soldier`** — user đã tìm 26/10: **Mendeley ~8k** (bird's-eye, YOLO format, Soldier/Drone/Tank/People, label CVAT→YOLO .txt — `data.mendeley.com/datasets/9z7yrcrpjk`) + **Roboflow ~4.8k** (backup, v1, export YOLOv8/v11 — `universe.roboflow.com/1-ukcc8/uav-tank-soldier-cjbmf`) | Verify fail (license/chất lượng label) → không fine-tune được `soldier` (chỉ còn `person`) | W3d3 | Download trên server (2 link trên) + verify license + spot-check 50–100 label + tham số thu (Mendeley card: bird's-eye/altitude variation, **không ghi số cố định** — ghi nhận vào report); map Soldier→soldier, Tank→military_vehicle, People→person, Drone→loại; backup: footage i1 Pro tự quay (bonus domain-adapt); nếu cả 3 fail → escalate giảng viên (giữ 7 class) |
+| B9 | **Nguồn ảnh class `soldier`** — user đã tìm 26/10: **Mendeley ~8k** (bird's-eye, YOLO format, Soldier/Drone/Tank/People, label CVAT→YOLO .txt — `data.mendeley.com/datasets/9z7yrcrpjk`) + **Roboflow ~4.8k** (backup, v1, export YOLOv8/v11 — `universe.roboflow.com/1-ukcc8/uav-tank-soldier-cjbmf`) | Verify fail (license/chất lượng label) → không fine-tune được `soldier` (chỉ còn `person`) | **✓ Mendeley verify xong sớm 27/10** | Mendeley: 7,985 ảnh / 16,341 boxes (soldier 3,436), license CC BY 4.0, spot-check label + render 4 class OK, fix 782 file thiếu newline; map Soldier→soldier, Tank→military_vehicle, People→person, Drone→loại (952 ảnh negative train); **Roboflow = deferred backup** (cần token, không block); tham số thu: bird's-eye/altitude variation, không số cố định → ghi báo cáo; fallback footage i1 Pro (bonus domain-adapt) giữ nguyên |
 
 ## KPI (acceptance criteria — PDR §5)
 
@@ -348,3 +348,51 @@ briefing §3 dataset table soldier row.
 .txt; card ghi bird's-eye + altitude variation, **không có số cố định** độ cao/FOV) · Roboflow
 `universe.roboflow.com/1-ukcc8/uav-tank-soldier-cjbmf` (v1, export YOLOv8/v11).
 **Còn mở:** verify thật trên server W3d3 (WebSearch API lỗi 400 — không verify link live được).
+
+### Session 11 — 2026-10-27/28 (Prep dataset: 3 nguồn tải + verify, heretic-8c hợp nhất 30,196 ảnh)
+
+**Bối cảnh:** user yêu cầu chuẩn bị file dataset training; user tìm link MVRSD + VisDrone;
+Mendeley user tự download qua browser (curl không được — signed-URL cần JS).
+**Đã làm:**
+- **MVRSD** (13,582 ảnh, 5 class, YOLO native) qua **mirror InvictusRex (GitHub LFS)** —
+  không cần Baidu → **B5 đóng**.
+- **VisDrone** (9,209 ảnh có label: train 6,471/val 548/test-dev 1,610, 10 class, YOLO)
+  qua HuggingFace mirror.
+- **Mendeley** (7,985 ảnh / 16,341 boxes: tank 5,583/drone 1,486/people 5,836/soldier 3,436,
+  CC BY 4.0) — spot-check label OK; **782 file thiếu trailing newline** đã fix (329 dòng "lỗi"
+  khi `cat` = artifact join giữa file, data gốc sạch); **B9 (Mendeley) verify xong sớm**;
+  Roboflow = deferred (cần token, backup).
+- **`prepare_heretic_8c_dataset.py`** (mới, 112 dòng) → `dataset/heretic-8c/`:
+  **30,196 ảnh** (train 24,270/val 3,041/test 2,885), 8 class, symlink ảnh + label remap,
+  `heretic-8c.yaml`. Mapping: MVRSD 5c→military_vehicle · VisDrone ped+people→person,
+  car/motor/truck/bus (loại bicycle/van/tricycle/awning) · Mendeley Soldier→soldier,
+  Tank→military_vehicle, People→person, Drone→loại. Verify: 0 malformed, 0 class ID ngoài
+  [0,7], visual render 4/4 (soldier/military_vehicle/person/negative).
+- **Decision (user chốt 27/10):** giữ 1,359 ảnh drone Mendeley làm **negative sample**
+  (label rỗng) — giảm false positive với vật thể trên không; không xóa ảnh.
+**Lưu ý W4:** mất cân bằng car 187k vs soldier 3.4k (54:1) → cân nhắc class weighting/
+oversampling; boat = 0 sample (COCO subset chưa làm).
+**Impact:** `prepare_heretic_8c_dataset.py` (mới) · `dataset/heretic-8c/` (mới, gitignored) ·
+plan.md (W3 row, B5 đóng, B9 verify, Session 11).
+**Còn mở:** Roboflow token (backup) · tham số thu UAV ghi báo cáo (W3).
+
+### Session 12 — 2026-10-28 (COCO boat subset: 3,025 ảnh → heretic-8c đầy đủ 8 class)
+
+**Bối cảnh:** user chốt "xử lý COCO trước, prep W4 để sau" + đi báo cáo giảng viên về dataset.
+**Đã làm:**
+- Tải COCO 2017 (annotations 242MB + train2017.zip 19.34GB) → parse `instances_train2017.json`.
+- **`prepare_coco_boat_subset.py`** (mới): extract chỉ ảnh có box boat, label boat-only class 0,
+  split 80/10/10 deterministic (image_id order, index%10) → `dataset/coco-boat-subset/`
+  **3,025 ảnh / 10,576 box** (train 2,421/val 302/test 302; loại 35 box iscrowd).
+- **`prepare_heretic_8c_dataset.py`**: thêm source "coco" (map 0→6) → re-run.
+- **heretic-8c final: 33,221 ảnh** (train 26,691/val 3,343/test 3,187), boat = 10,576 boxes.
+- Verify: 33,221 label files 0 malformed, class ID ∈[0,7], coord ∈[0,1]; visual render 2/2 boat.
+**Bug catch (visual check):** draft đầu dùng **cat_id 51 = bowl** (không phải boat) → render ra
+ảnh nồi bếp; boat thật là **cat_id 9** → sửa + re-run. Visual check bắt được, không leak vào train.
+**Lưu ý W4:** boat COCO = cảnh harbor/street (boat to, gần) vs UAV bird's-eye (boat nhỏ) → domain
+gap, chấp nhận (boat = class phụ cảnh báo, không phải class chính). Mất cân bằng car 187k vs
+soldier 3.4k (54:1) vẫn là điểm chú ý chính khi fine-tune.
+**Impact:** `prepare_coco_boat_subset.py` (mới) · `prepare_heretic_8c_dataset.py` (+coco source) ·
+`dataset/coco-boat-subset/` + `dataset/heretic-8c/` (gitignored) · plan.md (W3 row, Session 12).
+**Còn mở:** Roboflow token (backup) · tham số thu UAV ghi báo cáo (W3) · **prep W4 fine-tune**
+(server multi-GPU + pin version ultralytics server==laptop) — user defer.
