@@ -45,37 +45,48 @@ Dataset **đặc thù góc UAV** (yêu cầu giảng viên 2026-10-16): tham s�
 
 ## Architecture
 
-Data flow:
+Data flow (thực tế 28–29/10 — 4 nguồn đã merge):
 
 ```
-MVRSD (Baidu pan; fallback AMAD/InvictusRex GitHub) — góc drone/satellite
-  → prepare_mvrsd.py: extract → labels YOLO format
-      (mọi label xe quân sự → `military_vehicle`; bỏ label máy bay) → split 80/20
-  + VisDrone subset 5 class (person, car, motorcycle, truck, bus) — góc drone
-  + nguồn ảnh `soldier` (B9: footage UAV thật tự quay ưu tiên / dataset mở)
-  → datasets/mvrsd-8c.yaml  (8 names, paths)
-  + COCO subset 6 class (~2000 ảnh, trộn chống regression)
-  → train_military_yolo.py (server): yolo detect train, imgsz=640, epochs≈30,
-      device=0,1, batch=64 (multi-GPU — quyết định 2026-10-15)
+4 nguồn (đều YOLO .txt) — đã tải + verify:
+  - MVRSD     13,582 ảnh (mirror InvictusRex, Baidu không cần — B5 đóng)  → military_vehicle
+  - VisDrone   9,209 ảnh (HuggingFace)                                    → person, car, motorcycle, truck, bus
+  - Mendeley   7,985 ảnh (CC BY 4.0, fix 782 newline)                     → soldier, military_vehicle, person
+  - COCO boat  3,025 ảnh (cat_id 9, prepare_coco_boat_subset.py)          → boat
+  → prepare_heretic_8c_dataset.py: merge + remap class → dataset/heretic-8c/
+      33,221 ảnh (train 26,691/val 3,343/test 3,187), 8 class, heretic-8c.yaml
+  → train_military_yolo.py (server): train imgsz=640, epochs=30, batch=64,
+      device=0,1 (multi-GPU — quyết định 2026-10-15)
   → weights/yolo26n-military-8c.pt
-  → requirements-lock.txt: pin ultralytics + torch (server == laptop)
+  → requirements-lock.txt: pin ultralytics + torch + torchvision (server == laptop)
   → laptop: heretic_phase4_hud.py --model weights/yolo26n-military-8c.pt
   → tactical_slm.py: DANGEROUS_TARGETS − "person" + {"soldier","military_vehicle"},
     SYSTEM_PROMPT: soldier → "kẻ địch", military_vehicle → "xe quân sự địch",
     person → "dân thường" (không cảnh báo)
 ```
 
-Regression check: val cả model cũ và mới trên COCO subset 6 class → chênh mAP50 ≤5 điểm.
+Regression check (AC7 "mAP 6 class COCO giảm ≤5 điểm"): val model cũ (yolo26n gốc) + model
+mới trên **coco128** (ultralytics tự download khi val) → chênh mAP50 ≤5 điểm. Không cần
+tự build COCO 6-class subset — coco128 đủ cho check này.
+
+**Logistics server (mới, 29/10):** `dataset/` đã gitignored → clone repo trên server KHÔNG
+có `dataset/heretic-8c/`. Cần (a) sync 4 source dataset + re-run 2 script prep trên server,
+HOẶC (b) transfer `dataset/` build sẵn qua network/USB. Quyết định lúc lên server W4d1.
 
 ## Related Code Files
 
-**Create**
-- `datasets/prepare_mvrsd.py` — tải/extract MVRSD, chuyển label sang YOLO format, split, sinh yaml.
-- `datasets/mvrsd-8c.yaml` — config dataset 8 class (sinh bởi script trên, commit).
-- `train_military_yolo.py` — script train + val trên server (bọc lệnh `yolo detect train/val`).
+**Create** (trạng thái 29/10 — dataset đã build, script train đã sẵn):
+- `prepare_heretic_8c_dataset.py` (root) — **✓ XONG 28/10**: merge 4 nguồn (MVRSD + VisDrone +
+  Mendeley + COCO boat) → `dataset/heretic-8c/{train,val,test}` + `heretic-8c.yaml`
+  (33,221 ảnh, 8 class, symlink ảnh + label remap). Re-run an toàn.
+- `prepare_coco_boat_subset.py` (root) — **✓ XONG 28/10**: extract 3,025 ảnh boat từ
+  COCO 2017 (cat_id 9) → `dataset/coco-boat-subset/` (boat-only class 0, split 80/10/10).
+- `train_military_yolo.py` (root) — **✓ XONG 29/10**: train + val multi-GPU
+  (`data=dataset/heretic-8c/heretic-8c.yaml`, imgsz=640, epochs=30, batch=64, device=0,1),
+  copy best → `weights/yolo26n-military-8c.pt`, in mAP tổng + per-class.
+- `requirements-lock.txt` (root) — **✓ XONG 29/10**: pin ultralytics 8.4.162 + torch 2.14.0
+  + torchvision 0.29.0 (cu130) — server == laptop.
 - `weights/` — thư mục chứa weight sau train (chỉ commit file `.pt` cuối cùng; `.gitignore` draft).
-- `requirements-lock.txt` — pin version `ultralytics` + `torch` (+ `torchvision`) —
-  server == laptop để weight train trên Ada chạy được trên RTX 3050.
 
 **Modify**
 - `heretic_phase4_hud.py` — `:184` `YOLO("yolo26n.pt")` → đọc từ flag `--model` (default `yolo26n.pt`).

@@ -1,0 +1,10 @@
+# Pinned so the server (4x RTX 5000 Ada) and laptop (RTX 3050 4GB) install the
+# SAME inference/training stack — a weight fine-tuned on the server must load and
+# run on the laptop (AC7). Verified on the dev server 2026-10-29.
+#
+# Install the CUDA 13.0 build of torch/torchvision (works on both Ada and Ampere):
+#   pip install torch==2.14.0 torchvision==0.29.0 --index-url https://download.pytorch.org/whl/cu130
+#   pip install -r requirements-lock.txt
+ultralytics==8.4.162
+torch==2.14.0
+torchvision==0.29.0
