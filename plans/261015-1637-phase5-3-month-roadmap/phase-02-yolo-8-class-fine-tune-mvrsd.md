@@ -69,9 +69,13 @@ Regression check (AC7 "mAP 6 class COCO giảm ≤5 điểm"): val model cũ (yo
 mới trên **coco128** (ultralytics tự download khi val) → chênh mAP50 ≤5 điểm. Không cần
 tự build COCO 6-class subset — coco128 đủ cho check này.
 
-**Logistics server (mới, 29/10):** `dataset/` đã gitignored → clone repo trên server KHÔNG
-có `dataset/heretic-8c/`. Cần (a) sync 4 source dataset + re-run 2 script prep trên server,
-HOẶC (b) transfer `dataset/` build sẵn qua network/USB. Quyết định lúc lên server W4d1.
+**Logistics server (chốt 29/10 — hướng a):** `dataset/` gitignored → clone repo trên server
+KHÔNG có dataset. **Chuyển 4 nguồn (~7.3GB) qua tarball** `dataset/heretic-8c-sources-for-server.tar`
+(MVRSD + VisDrone + Mendeley + coco-boat-subset build sẵn — KHÔNG cần COCO zip 19G), extract
+trên server, rồi **chỉ chạy `prepare_heretic_8c_dataset.py`** (rebuild heretic-8c, symlink trỏ
+nguồn local). Bỏ qua `prepare_coco_boat_subset.py` trên server. Không transfer `heretic-8c`
+merge trực tiếp vì symlink tuyệt đối bẻ gẫy + dereference ra cùng ~7.3GB mà mất nguồn gốc.
+Giữ nguồn trên server để sau này re-merge Roboflow soldier / sửa class map.
 
 ## Related Code Files
 
