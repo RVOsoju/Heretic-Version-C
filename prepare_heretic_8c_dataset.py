@@ -95,8 +95,10 @@ def build() -> None:
                 n_img += 1
             per_split[split] = per_split.get(split, 0) + n_img
             print(f"  {tag:9s} {split:5s}: {n_img} images")
+    # path MUST be absolute: ultralytics resolves relative `path` against CWD,
+    # not the yaml location, so a bare "." breaks training when run from repo root.
     yaml_text = (
-        "path: .\n"
+        f"path: {OUT.resolve().as_posix()}\n"
         "train: train/images\n"
         "val: val/images\n"
         "test: test/images\n"
