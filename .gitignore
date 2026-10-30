@@ -2,3 +2,9 @@ __pycache__/
 *.pyc
 .venv/
 dataset/
+
+# Training artifacts — log grows per epoch, run dirs hold big .pt/plots.
+# Keep top-level final weights (weights/*.pt) trackable; ignore run subdirs.
+*.log
+runs/
+weights/*/
