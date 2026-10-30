@@ -17,7 +17,7 @@ Chay:
   python tactical_slm.py --demo                 # template (mat, khong can Ollama)
   python tactical_slm.py --demo --slm           # SLM (can Ollama)
   python heretic_phase4_hud.py | python tactical_slm.py
-  echo '{"soldier_gps":{},"detected_threats":[{"target":"person","distance_m":95,"bearing":"Tay"}]}' | python tactical_slm.py
+  echo '{"soldier_gps":{},"detected_threats":[{"target":"soldier","distance_m":95,"bearing":"Tay"}]}' | python tactical_slm.py
 """
 
 import json
@@ -33,12 +33,13 @@ OLLAMA_URL = f"{OLLAMA_HOST}/api/generate"
 MODEL = "qwen2.5:3b"
 
 # Chi can bao cac loai target mat (binh lanh + phuong tien)
-DANGEROUS_TARGETS = {"person", "car", "motorcycle", "truck", "bus", "boat",
-                     "soldier", "military_vehicle"}
+# "person" = dan thuong (KHONG nguy hiem) -> khong can bao
+DANGEROUS_TARGETS = {"soldier", "car", "motorcycle", "truck", "bus", "boat",
+                     "military_vehicle"}
 
 # Ten goi chung cho cau canh bao template (khong SLM)
+# "person" khong co o day dan thuong khong bao (xem DANGEROUS_TARGETS)
 TARGET_LABELS = {
-    "person": "Kẻ địch",
     "soldier": "Kẻ địch",
     "car": "Xe địch",
     "motorcycle": "Xe máy địch",
@@ -66,8 +67,8 @@ def template_alert(threat):
 SYSTEM_PROMPT = """Ban la He thong Canh bao Chien thuat cua mot quan doi.
 Doc JSON cam bien va tra ve DUY NHAT 1 cau canh bao bang tieng Viet, toi da 12 tu, bat dau bang "CANH BAO:".
 - Chi lay target NGUY HIEM NHAT ( khoang cach gan nhat ) trong danh sach.
-- Chi tinh den target: person, car, motorcycle, truck, bus, boat.
-- person -> "Ke dich"; car/motorcycle -> "xe dich"; truck/bus -> "xe tai dich".
+- Chi tinh den target: soldier, car, motorcycle, truck, bus, boat, military_vehicle. BO qua "person" (dan thuong, khong nguy hiem).
+- soldier -> "Ke dich"; military_vehicle -> "xe quan su dich"; car/motorcycle -> "xe dich"; truck/bus -> "xe tai dich"; boat -> "thuyen dich".
 - Neu khong co target nguy hiem: tra ve "An toan".
 - Khong giai thich, khong them dong khac, khong markdown.
 Vi du: CANH BAO: Ke dich cach 12m huong Dong!"""
@@ -180,7 +181,7 @@ def run_demo(gater, use_slm=False):
     for distance in [95, 90, 85, 75, 65, 55, 45, 35, 25, 15, 9, 8, 7, 5, 3, 1]:
         payload = {
             "soldier_gps": {"lat": 21.0333, "lon": 105.7333, "location": "Tu Liem, Ha Noi"},
-            "detected_threats": [{"target": "person", "distance_m": distance, "bearing": "Tay"}],
+            "detected_threats": [{"target": "soldier", "distance_m": distance, "bearing": "Tay"}],
         }
         process_payload(payload, gater, use_slm=use_slm)
         time.sleep(0.3)

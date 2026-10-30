@@ -160,6 +160,8 @@ def main():
                         help="Chay YOLO tren CPU - de nguyen VRAM cho SLM (laptop 4GB VRAM)")
     parser.add_argument("--slm", action="store_true",
                         help="Bat SLM Ollama cho cau canh bao (mac dinh: template, khong can Ollama)")
+    parser.add_argument("--model", metavar="WEIGHT", default="yolo26n.pt",
+                        help="Duong dan weight YOLO (mac dinh: yolo26n.pt; duoc: weights/yolo26n-military-8c.pt)")
     args = parser.parse_args()
 
     # Toa do lich: --gps-port (phan cuong) > --soldier-gps (thua tay) > muc dinh
@@ -190,7 +192,7 @@ def main():
         print("[SIM] HUD hop thanh: binh lanh tiep can huong Tay 95m -> 1m")
         for distance in [95, 90, 85, 75, 65, 55, 45, 35, 25, 15, 9, 8, 7, 5, 3, 1]:
             frame, sim_box = make_sim_frame(distance, "Tây")
-            t = {"target": "person", "distance_m": distance,
+            t = {"target": "soldier", "distance_m": distance,
                  "bearing": "Tây", "box": sim_box}
             t["side"] = "friendly" if friendly_fn and friendly_fn(t) else "enemy"
             tactical = [t]
@@ -210,7 +212,7 @@ def main():
 
     print("[INFO] Dang nap mo hinh YOLO...")
     from ultralytics import YOLO
-    model = YOLO("yolo26n.pt")
+    model = YOLO(args.model)
 
     # Warmup SLM chi khi --slm (mac dinh: template 0ms, khong can Ollama)
     if args.slm:

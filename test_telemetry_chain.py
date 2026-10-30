@@ -88,11 +88,11 @@ def main():
 
     # Kenh cau canh bao: template (mac dinh, khong Ollama) + gater ngat ngan
     check("template cau hinh dung",
-          template_alert({"target": "person", "distance_m": 95, "bearing": "Đông"})
+          template_alert({"target": "soldier", "distance_m": 95, "bearing": "Đông"})
           == "CẢNH BÁO: Kẻ địch cách 95m hướng Đông!")
     g = TacticalAlertGater()
     payload = {"soldier_gps": {"lat": 21.0333, "lon": 105.7333},
-               "detected_threats": [{"target": "person", "distance_m": 95.0,
+               "detected_threats": [{"target": "soldier", "distance_m": 95.0,
                                      "bearing": "Tây", "track_id": 42}]}
     a1 = evaluate_alert(payload, g)
     check("template 95m lan 1 -> co canh bao",
@@ -103,7 +103,7 @@ def main():
     # AC3: gater theo track_id — cut nguong 100m mot lan = dung 1 canh bao
     g3 = TacticalAlertGater()
     p3 = {"soldier_gps": {"lat": slat, "lon": slon},
-          "detected_threats": [{"target": "person", "distance_m": 105.0,
+          "detected_threats": [{"target": "soldier", "distance_m": 105.0,
                                 "bearing": "Tây", "track_id": 7}]}
     check("AC3 105m (chua qua nguong 100m) -> im lang", evaluate_alert(p3, g3) is None)
     p3["detected_threats"][0]["distance_m"] = 95.0
@@ -115,9 +115,9 @@ def main():
     g4 = TacticalAlertGater()
     p_multi = {"soldier_gps": {"lat": slat, "lon": slon},
                "detected_threats": [
-                   {"target": "person", "distance_m": 95.0,
+                   {"target": "soldier", "distance_m": 95.0,
                     "bearing": "Tây", "track_id": 1},
-                   {"target": "person", "distance_m": 42.0,
+                   {"target": "soldier", "distance_m": 42.0,
                     "bearing": "Đông", "track_id": 2},
                    {"target": "car", "distance_m": 60.0,
                     "bearing": "Bắc", "track_id": 3}]}
