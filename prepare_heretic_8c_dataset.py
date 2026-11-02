@@ -12,6 +12,7 @@ class IDs. Excluded classes drop their label lines; an image left with no box
 becomes an empty label file = negative sample (supplies "nothing to alert on").
 Re-run safe: output dir is rebuilt from scratch.
 """
+import random
 import shutil
 from pathlib import Path
 
@@ -53,9 +54,15 @@ SOURCES = {
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png"}
 
+# Box-level downsampling of the two dominant classes so the rare threat classes
+# (soldier/bus/truck/boat) get a bigger share of the gradient. car is ~41% of all
+# boxes, person ~34%. Keep-probability per target class id; applied to TRAIN ONLY
+# so val/test stay full-density for unbiased mAP. Seeded -> reproducible.
+DOWNSAMPLE = {2: 0.3, 0: 0.5}  # car->0.3, person->0.5
 
-def remap_label(text: str, cmap: dict) -> str:
-    """Rewrite class ids; drop lines of excluded classes and malformed lines."""
+
+def remap_label(text: str, cmap: dict, rng: random.Random, downsample: dict) -> str:
+    """Rewrite class ids; drop excluded/malformed lines; downsample dominant classes."""
     kept = []
     for line in text.splitlines():
         parts = line.split()
@@ -63,7 +70,9 @@ def remap_label(text: str, cmap: dict) -> str:
             continue
         cls = int(parts[0])
         if cls in cmap:
-            kept.append(f"{cmap[cls]} " + " ".join(parts[1:]))
+            tid = cmap[cls]
+            if rng.random() < downsample.get(tid, 1.0):
+                kept.append(f"{tid} " + " ".join(parts[1:]))
     return "\n".join(kept)
 
 
@@ -71,6 +80,7 @@ def build() -> None:
     if OUT.exists():
         shutil.rmtree(OUT)
     per_split, per_class = {}, {i: 0 for i in range(len(CLASSES))}
+    rng = random.Random(0)  # reproducible downsampling
     for tag, src in SOURCES.items():
         for split, src_split in src["splits"].items():
             img_dir = src["base"] / src_split / "images"
@@ -87,7 +97,8 @@ def build() -> None:
                     continue
                 name = f"{tag}__{img_file.name}"
                 (out_img / name).symlink_to(img_file.resolve())
-                label = remap_label(lbl_file.read_text(), src["map"])
+                ds = DOWNSAMPLE if split == "train" else {}
+                label = remap_label(lbl_file.read_text(), src["map"], rng, ds)
                 (out_lbl / f"{tag}__{img_file.stem}.txt").write_text(
                     label + "\n" if label else "")
                 for line in label.splitlines():

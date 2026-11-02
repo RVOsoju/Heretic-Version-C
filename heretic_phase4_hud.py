@@ -161,7 +161,9 @@ def main():
     parser.add_argument("--slm", action="store_true",
                         help="Bat SLM Ollama cho cau canh bao (mac dinh: template, khong can Ollama)")
     parser.add_argument("--model", metavar="WEIGHT", default="yolo26n.pt",
-                        help="Duong dan weight YOLO (mac dinh: yolo26n.pt; duoc: weights/yolo26n-military-8c.pt)")
+                        help="Duong dan weight YOLO (mac dinh: yolo26n.pt; duoc: weights/yolo26s-military-8c.pt)")
+    parser.add_argument("--video", metavar="PATH",
+                        help="Test voi video file thay vi webcam (vd: assets/bus-360p.mp4, clip UAV thuc)")
     args = parser.parse_args()
 
     # Toa do lich: --gps-port (phan cuong) > --soldier-gps (thua tay) > muc dinh
@@ -222,18 +224,25 @@ def main():
         except Exception as exc:
             print(f"[CANH CAO] SLM chua san sang (Ollama chua chay?) — de duoc cai template: {exc}")
 
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
-    cx, cy = FRAME_WIDTH // 2, FRAME_HEIGHT // 2
+    # webcam (mac dinh) hoac video file (--video) de test clip thuc
+    src = args.video if args.video else 0
+    cap = cv2.VideoCapture(src)
+    if not args.video:  # chi set resolution voi webcam; video giu resolution goc
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
     print("🔥 [HERETIC C - PHASE 4] HUD san sang. Bam 'q' de thoat.")
 
     yolo_device = "cpu" if args.cpu else None
     flash_left = 0
+    cx = cy = None  # lay tu khung dau tien → hoat dong voi moi resolution
+    fps_n, fps_t0 = 0, time.time()
     while cap.isOpened():
         success, frame = cap.read()
         if not success:
             break
+        if cx is None:  # khung dau tien: doc kich thuoc thuc te
+            h, w = frame.shape[:2]
+            cx, cy = w // 2, h // 2
         results = model.track(frame, persist=True, tracker="bytetrack.yaml",
                               stream=False, verbose=False, device=yolo_device)
         tactical = build_tactical_data(results, cx, cy, PIXEL_TO_METER, model.names,
@@ -245,6 +254,11 @@ def main():
         cv2.imshow("Heretic Tactical HUD - Phase 4",
                    render_hud(frame, tactical, alert, time.time(), uav_frac, gps_units,
                               flash=flash_left > 0))
+        fps_n += 1
+        if fps_n % 30 == 0:  # bao FPS moi 30 khung de do realtime
+            fps = fps_n / (time.time() - fps_t0)
+            fps_n, fps_t0 = 0, time.time()
+            print(f"[FPS] {fps:.1f}")
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
