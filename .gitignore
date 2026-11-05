@@ -8,3 +8,9 @@ dataset/
 *.log
 runs/
 weights/*/
+
+# Large K2 combat test clips (source + re-encode + detect renders, ~1.6GB).
+# Regenerable from the source clip + the 26s-rebal weight; kept on disk for viewing.
+assets/k2-*.mp4
+# Extracted 1fps frame batches for manual labeling (regenerable from the clips).
+assets/*-frames/
