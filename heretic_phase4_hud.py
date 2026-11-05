@@ -19,6 +19,7 @@ import time
 
 import cv2
 import numpy as np
+import torch
 
 from tactical_height_anchor import (FALLBACK_SCALE, MIN_ANCHOR_BOX_H_PX, SIM_FOV_DEG,
                                     SIM_UAV_ALT_M, height_anchor_scale, sim_frame_scale)
@@ -232,7 +233,7 @@ def main():
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
     print("🔥 [HERETIC C - PHASE 4] HUD san sang. Bam 'q' de thoat.")
 
-    yolo_device = "cpu" if args.cpu else None
+    yolo_device = "cpu" if args.cpu else (0 if torch.cuda.is_available() else "cpu")
     flash_left = 0
     cx = cy = None  # lay tu khung dau tien → hoat dong voi moi resolution
     fps_n, fps_t0 = 0, time.time()
