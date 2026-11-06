@@ -159,6 +159,8 @@ def main():
                         help="Doc NEO-6M cua lich qua USB TTL, vi du: /dev/ttyUSB0 (Windows: COM5)")
     parser.add_argument("--cpu", action="store_true",
                         help="Chay YOLO tren CPU - de nguyen VRAM cho SLM (laptop 4GB VRAM)")
+    parser.add_argument("--fp16", action="store_true",
+                        help="Chay YOLO FP16 (half precision) - tang FPS tren GPU (chi CUDA, khong CPU)")
     parser.add_argument("--slm", action="store_true",
                         help="Bat SLM Ollama cho cau canh bao (mac dinh: template, khong can Ollama)")
     parser.add_argument("--model", metavar="WEIGHT", default="yolo26n.pt",
@@ -234,6 +236,10 @@ def main():
     print("🔥 [HERETIC C - PHASE 4] HUD san sang. Bam 'q' de thoat.")
 
     yolo_device = "cpu" if args.cpu else (0 if torch.cuda.is_available() else "cpu")
+    # FP16 (half) chi chay tren GPU - bat khi --fp16 + co CUDA (CPU thi vo nghia)
+    use_half = bool(args.fp16 and not args.cpu and torch.cuda.is_available())
+    if use_half:
+        print("[INFO] FP16 (half precision) da bat - tang FPS tren GPU")
     flash_left = 0
     cx = cy = None  # lay tu khung dau tien → hoat dong voi moi resolution
     fps_n, fps_t0 = 0, time.time()
@@ -245,7 +251,7 @@ def main():
             h, w = frame.shape[:2]
             cx, cy = w // 2, h // 2
         results = model.track(frame, persist=True, tracker="bytetrack.yaml",
-                              stream=False, verbose=False, device=yolo_device)
+                              stream=False, verbose=False, device=yolo_device, half=use_half)
         tactical = build_tactical_data(results, cx, cy, PIXEL_TO_METER, model.names,
                                        friendly_fn, tracker=tracker, ts=time.time())
         tracker.prune()
