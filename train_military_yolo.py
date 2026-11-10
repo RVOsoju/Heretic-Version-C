@@ -32,22 +32,29 @@ def run_name_for(base: str) -> str:
 
 
 def train(args, base_path: Path, run_name: str, final_weight: Path) -> Path:
-    model = YOLO(str(base_path))
-    model.train(
-        data=str(DATA_YAML),
-        epochs=args.epochs,
-        batch=args.batch,
-        imgsz=args.imgsz,
-        device=args.device,
-        project=str(OUT_DIR),
-        name=run_name,
-        exist_ok=True,
-        seed=0,
-        mosaic=args.mosaic,
-        mixup=args.mixup,
-        copy_paste=args.copy_paste,  # synthesize extra instances of rare classes
-        close_mosaic=args.close_mosaic,  # disable mosaic in the final N epochs
-    )
+    if args.resume:
+        # continue from last.pt (restores epoch + optimizer + lr) — use after a crash/kill
+        last = OUT_DIR / run_name / "weights" / "last.pt"
+        model = YOLO(str(last))
+        model.train(resume=True, device=args.device, batch=args.batch, workers=args.workers)
+    else:
+        model = YOLO(str(base_path))
+        model.train(
+            data=str(DATA_YAML),
+            epochs=args.epochs,
+            batch=args.batch,
+            imgsz=args.imgsz,
+            device=args.device,
+            workers=args.workers,
+            project=str(OUT_DIR),
+            name=run_name,
+            exist_ok=True,
+            seed=0,
+            mosaic=args.mosaic,
+            mixup=args.mixup,
+            copy_paste=args.copy_paste,  # synthesize extra instances of rare classes
+            close_mosaic=args.close_mosaic,  # disable mosaic in the final N epochs
+        )
     best = OUT_DIR / run_name / "weights" / "best.pt"
     shutil.copyfile(best, final_weight)
     print(f"Best weight copied to: {final_weight}")
@@ -56,8 +63,8 @@ def train(args, base_path: Path, run_name: str, final_weight: Path) -> Path:
 
 def validate(args, weight: Path) -> None:
     model = YOLO(str(weight))
-    results = model.val(data=str(DATA_YAML), split="val", imgsz=args.imgsz,
-                        device=args.device)
+    results = model.val(data=str(Path(args.data)), split="val", imgsz=args.imgsz,
+                        device=args.device, workers=0)  # workers=0 avoids dataloader deadlock on corrupt images
     print(f"mAP50: {results.box.map50:.4f}   mAP50-95: {results.box.map:.4f}")
     print("Per-class mAP50-95:")
     maps = results.box.maps  # np.ndarray indexed by class id
@@ -69,6 +76,8 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--epochs", type=int, default=30)
     p.add_argument("--batch", type=int, default=64)
+    p.add_argument("--workers", type=int, default=8,
+                   help="dataloader workers (raise to feed GPU when CPU-bound)")
     p.add_argument("--imgsz", type=int, default=640)
     p.add_argument("--device", type=str, default="0,1")
     p.add_argument("--mosaic", type=float, default=1.0)
@@ -82,12 +91,19 @@ def main() -> None:
     p.add_argument("--base", type=str, default="yolo26n.pt",
                    help="pretrained base model (yolo26n.pt / yolo26s.pt); "
                         "run name + final weight derive from its stem")
+    p.add_argument("--name", type=str, default=None,
+                   help="override run name + final weight name "
+                        "(default: derived from --base stem)")
+    p.add_argument("--resume", action="store_true",
+                   help="resume from <run>/weights/last.pt (continue from saved epoch after a crash/kill)")
+    p.add_argument("--data", type=str, default=str(DATA_YAML),
+                   help="data yaml used by --val-only (default: heretic-8c.yaml)")
     args = p.parse_args()
 
     if not DATA_YAML.exists():
         raise SystemExit(f"Missing {DATA_YAML} — run prepare_heretic_8c_dataset.py first")
 
-    run_name = run_name_for(args.base)
+    run_name = args.name if args.name else run_name_for(args.base)
     final_weight = OUT_DIR / f"{run_name}.pt"
 
     if args.val_only:
