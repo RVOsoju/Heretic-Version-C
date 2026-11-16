@@ -1,3 +1,6 @@
+# Local Claude Code guidance — kept out of the personal remote
+CLAUDE.md
+
 __pycache__/
 *.pyc
 .venv/
