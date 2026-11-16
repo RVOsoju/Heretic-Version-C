@@ -43,7 +43,8 @@ def is_friendly(t):
 
 
 def calculate_tactical_telemetry(box, center_x, center_y, scale):
-    """Khoang cach (m) + huong tu tam (lich) den tam box - nhap tu Phase 2."""
+    """Khoang cach (m) + huong 4 phuong + goc that (do) tu tam khung den tam box.
+    goc: 0=Dong (phai), 90=Bac (len), 180=Tay (trai), 270=Nam (xuoi duoi) — de minimap dat diem."""
     import math
     x1, y1, x2, y2 = box.xyxy[0].tolist()
     dx = (x1 + x2) / 2 - center_x
@@ -58,7 +59,7 @@ def calculate_tactical_telemetry(box, center_x, center_y, scale):
         direction = "Tây"
     else:
         direction = "Nam"
-    return distance, direction
+    return distance, direction, angle_deg
 
 
 def build_tactical_data(results, center_x, center_y, scale, model_names, friendly_fn=None,
@@ -73,13 +74,14 @@ def build_tactical_data(results, center_x, center_y, scale, model_names, friendl
             class_name = model_names[int(box.cls[0])]
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
             box_scale = height_anchor_scale(class_name, y2 - y1, scale)
-            distance, direction = calculate_tactical_telemetry(box, center_x, center_y, box_scale)
+            distance, direction, angle_deg = calculate_tactical_telemetry(box, center_x, center_y, box_scale)
             track_id = int(box.id[0]) if box.id is not None else None
             t = {
                 "target": class_name,
                 "track_id": track_id,
                 "distance_m": distance,
                 "bearing": direction,
+                "angle_deg": angle_deg,
                 "box": (x1, y1, x2, y2),
             }
             if tracker is not None and track_id is not None and ts is not None:
@@ -164,7 +166,8 @@ def main():
     parser.add_argument("--slm", action="store_true",
                         help="Bat SLM Ollama cho cau canh bao (mac dinh: template, khong can Ollama)")
     parser.add_argument("--model", metavar="WEIGHT", default="yolo26n.pt",
-                        help="Duong dan weight YOLO (mac dinh: yolo26n.pt; duoc: weights/yolo26s-military-8c.pt)")
+                        help="Duong dan weight YOLO .pt hoac .engine (mac dinh yolo26n.pt; "
+                             "duoc: weights/yolo26s-military-8c-k2.pt hoac .engine tu export_trt_engine.py)")
     parser.add_argument("--video", metavar="PATH",
                         help="Test voi video file thay vi webcam (vd: assets/bus-360p.mp4, clip UAV thuc)")
     args = parser.parse_args()
@@ -198,7 +201,7 @@ def main():
         for distance in [95, 90, 85, 75, 65, 55, 45, 35, 25, 15, 9, 8, 7, 5, 3, 1]:
             frame, sim_box = make_sim_frame(distance, "Tây")
             t = {"target": "soldier", "distance_m": distance,
-                 "bearing": "Tây", "box": sim_box}
+                 "bearing": "Tây", "angle_deg": 180, "box": sim_box}
             t["side"] = "friendly" if friendly_fn and friendly_fn(t) else "enemy"
             tactical = [t]
             alert = evaluate_alert(enemies_payload(tactical), gater, use_slm=args.slm)

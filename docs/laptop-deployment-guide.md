@@ -2,7 +2,7 @@
 
 **Target runtime:** Asus TUF F15 FX507 — RTX 3050 (4 GB VRAM), i7-12700H, 16 GB DDR4.
 Server (4× RTX 5000 Ada) chỉ dùng để phát triển — hệ thống **phải** chạy mượt trên laptop.
-Ngày cập nhật: 2026-09-30
+Ngày cập nhật: 2026-11-16
 
 ## 1. Ngân sách VRAM 4 GB (vấn đề quan trọng nhất)
 
@@ -68,6 +68,29 @@ VRAM dùng < ~3,8 GB là an toàn; chạm trần 4 GB là nên bật `--cpu` (l�
   chấp nhận được vì gater chỉ bắn cảnh báo cách quãng (mỗi 10 m / 1 m).
 - Nếu sau này yêu cầu cứng < 0,2 s: thay Ollama bằng llama.cpp `llama-server`
   (không đổi interface `call_ollama` nhiều — chỉ đổi URL payload).
+
+## 4a. Tăng FPS với TensorRT (tùy chọn)
+
+Mặc định YOLO chạy từ `.pt` (eager). Export sang **TensorRT `.engine`** (FP16) tăng thêm
+~1,5–3× FPS trên RTX 3050, **giữ nguyên ByteTrack** (tracking là post-inference, độc lập backend).
+
+**Ràng buộc:** `.engine` ghim theo kiến trúc GPU + phiên bản TensorRT.
+Engine build trên server (Ada) **KHÔNG chạy** trên laptop (3050 Ampere) → **phải build trên laptop**.
+
+```powershell
+# 1) Cài 1 lần
+.venv\Scripts\pip install tensorrt onnx onnxslim
+
+# 2) Export (chạy TRÊN laptop, vài phút)
+python export_trt_engine.py --weight weights\yolo26s-military-8c-k2.pt --out weights\yolo26s-military-8c-k2.engine --imgsz 640 --half
+
+# 3) Chạy HUD với engine (ByteTrack giữ nguyên)
+python heretic_phase4_hud.py --model weights\yolo26s-military-8c-k2.engine --fp16
+```
+
+- `--model` nhận cả `.pt` lẫn `.engine` — không đổi gì ngoài flag.
+- `.engine` **không commit** (ghim GPU); build lại trên mỗi máy mục tiêu.
+- Nếu TensorRT gây rắc rối trên laptop: quay về `.pt` + `--fp16` (vẫn tốt), không mất gì.
 
 ## 5. Checklist trước khi demo
 
