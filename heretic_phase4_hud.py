@@ -170,6 +170,9 @@ def main():
                              "duoc: weights/yolo26s-military-8c-k2.pt hoac .engine tu export_trt_engine.py)")
     parser.add_argument("--video", metavar="PATH",
                         help="Test voi video file thay vi webcam (vd: assets/bus-360p.mp4, clip UAV thuc)")
+    parser.add_argument("--heading", type=float, metavar="DEG",
+                        help="Heading cua lich, do la ban (0=Bac, 90=Dong, dong chieu kim dong ho) — "
+                             "minimap xoay theo huong + ve mũi tên N (mac dinh: North-up)")
     args = parser.parse_args()
 
     # Toa do lich: --gps-port (phan cuong) > --soldier-gps (thua tay) > muc dinh
@@ -191,6 +194,15 @@ def main():
     # DONG DOI = nguoi co GPS con moi; khong feed -> het thuc la dich
     friendly_fn = (lambda t: is_friendly_by_gps(t, feed, soldier_latlon)) if feed else None
 
+    # Heading lich: do la ban (0=Bac, 90=Dong) → goc that (0=Dong, 90=Bac) cho minimap.
+    # Sim ma khong --heading: huong Tay — binh mo phong di tu phia do.
+    if args.heading is not None:
+        heading_deg = 90.0 - args.heading
+    elif args.sim:
+        heading_deg = 90.0 - 270.0
+    else:
+        heading_deg = None
+
     gater = TacticalAlertGater()
     tracker = TrackStore()
 
@@ -208,7 +220,7 @@ def main():
             flash_left = 3 if alert else max(0, flash_left - 1)  # flash 3 khung
             uav_frac, gps_units = minimap_units_from_feed(feed, soldier_latlon)
             out = render_hud(frame, tactical, alert, time.time(), uav_frac, gps_units,
-                             flash=flash_left > 0)
+                             flash=flash_left > 0, heading_deg=heading_deg)
             tag = "alert" if alert else "quiet"
             path = f"sim_hud_{distance}m_{tag}.png"
             cv2.imwrite(path, out)
@@ -263,7 +275,7 @@ def main():
         uav_frac, gps_units = minimap_units_from_feed(feed, soldier_latlon)
         cv2.imshow("Heretic Tactical HUD - Phase 4",
                    render_hud(frame, tactical, alert, time.time(), uav_frac, gps_units,
-                              flash=flash_left > 0))
+                              flash=flash_left > 0, heading_deg=heading_deg))
         fps_n += 1
         if fps_n % 30 == 0:  # bao FPS moi 30 khung de do realtime
             fps = fps_n / (time.time() - fps_t0)

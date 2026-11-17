@@ -56,17 +56,26 @@ def draw_soldier_marker(frame, cx, cy):
     _text(frame, "SOLDIER", (cx + 14, cy + 5), BLUE, 0.5, 1)
 
 
-def draw_minimap(frame, uav_frac, units, gps_units=()):
-    """Minimap goc phai tren: ban do vi tri don gian (KHONG kieu radar quet).
+def _rot_xy(dx, dy, phi):
+    """Xoay vec (dx, dy) goc phi (rad, duoc chieu) — de minimap xoay theo heading."""
+    c, s = math.cos(phi), math.sin(phi)
+    return dx * c - dy * s, dx * s + dy * c
+
+
+def draw_minimap(frame, uav_frac, units, gps_units=(), heading_deg=None):
+    """Minimap goc phai tren: ban do vi tri don gian.
     Tam = lich (xanh duong), dich = cham do, dong doi = cham xanh, UAV = cham xanh la.
-    Ring khoang cach 25/50/100m, 100m = mep map. (Dinh huong/heading: them sau.)
+    Ring khoang cach 25/50/100m, 100m = mep map.
     uav_frac: toa do (fx, fy) trong [0,1] cua UAV.
-    units: list (distance_m, angle_deg, side) — dat theo goc that 0-360 (0=Dong, 90=Bac len).
-    gps_units: list (dx_m, dy_m, side) — dong doi GPS thuc, toa do relative."""
+    units: list (distance_m, angle_deg, side) — goc that 0-360 (0=Dong, 90=Bac len).
+    gps_units: list (dx_m, dy_m, side) — dong doi GPS thuc, toa do relative.
+    heading_deg: heading lich theo goc that (0=Dong, 90=Bac); None = North-up,
+    co gia tri = len map la huong lich + mũi tên N chi phuong Bac."""
     s = MINIMAP_SIZE
     ox, oy = frame.shape[1] - s - 12, 12
     cx, cy = ox + s // 2, oy + s // 2
     px_per_m = (s / 2 - 12) / WARN_RANGE_M
+    phi = math.radians(90.0 - heading_deg) if heading_deg is not None else 0.0
 
     cv2.rectangle(frame, (ox, oy), (ox + s, oy + s), DARK, -1)
     cv2.rectangle(frame, (ox, oy), (ox + s, oy + s), (0, 120, 0), 1)
@@ -79,7 +88,7 @@ def draw_minimap(frame, uav_frac, units, gps_units=()):
 
     # Dich (do) / dong doi (xanh): dat theo goc that + khoang cach, giam trong map
     for dist, angle, side in units:
-        a = math.radians(float(angle))
+        a = math.radians(float(angle)) + phi
         d = min(float(dist), WARN_RANGE_M)
         ex = int(cx + math.cos(a) * d * px_per_m)
         ey = int(cy - math.sin(a) * d * px_per_m)
@@ -91,6 +100,8 @@ def draw_minimap(frame, uav_frac, units, gps_units=()):
 
     # Dong doi GPS that: toa do relative quanh lich (dy > 0 = Bac = len len)
     for dx, dy, side in gps_units:
+        if phi:
+            dx, dy = _rot_xy(dx, dy, phi)
         ex = int(cx + dx * px_per_m)
         ey = int(cy - dy * px_per_m)
         ex = max(ox + 4, min(ox + s - 4, ex))
@@ -100,10 +111,26 @@ def draw_minimap(frame, uav_frac, units, gps_units=()):
         cv2.circle(frame, (ex, ey), 8, color, 1, cv2.LINE_AA)
 
     # UAV (xanh la): vi tri tu feed hoac mo phong
-    ux = ox + int(uav_frac[0] * s)
-    uy = oy + int(uav_frac[1] * s)
+    dx, dy = (uav_frac[0] - 0.5) * s, (0.5 - uav_frac[1]) * s
+    if phi:
+        dx, dy = _rot_xy(dx, dy, phi)
+    ux, uy = int(cx + dx), int(cy - dy)
     cv2.circle(frame, (ux, uy), 5, GREEN, -1, cv2.LINE_AA)
     _text(frame, "UAV", (ux + 8, uy + 4), GREEN, 0.4, 1)
+
+    # Mũi tên N (vang): chi phuong Bac sau khi xoay theo heading
+    if heading_deg is not None:
+        a_n = math.pi / 2 + phi
+        r0, r1 = 16, s // 2 - 18
+        p0 = (int(cx + math.cos(a_n) * r0), int(cy - math.sin(a_n) * r0))
+        p1 = (int(cx + math.cos(a_n) * r1), int(cy - math.sin(a_n) * r1))
+        cv2.line(frame, p0, p1, (0, 220, 255), 2, cv2.LINE_AA)
+        for da in (0.45, -0.45):
+            q = (int(cx + math.cos(a_n + da) * (r1 - 9)),
+                 int(cy - math.sin(a_n + da) * (r1 - 9)))
+            cv2.line(frame, p1, q, (0, 220, 255), 2, cv2.LINE_AA)
+        pn = (p1[0] + int(math.cos(a_n) * 9) - 4, p1[1] - int(math.sin(a_n) * 9) + 4)
+        _text(frame, "N", pn, (0, 220, 255), 0.5, 1)
 
     # LICH MINH (xanh duong): tam
     cv2.circle(frame, (cx, cy), 6, BLUE, -1, cv2.LINE_AA)
@@ -135,12 +162,13 @@ def draw_alert_bar(frame, text, blink_on):
 
 
 def render_hud(frame, tactical_data, alert_text, now, uav_frac=(0.15, 0.18), gps_units=(),
-               flash=False):
+               flash=False, heading_deg=None):
     """Gop toan bo HUD len khung hinh. tactical_data: list {target, distance_m,
     bearing}. alert_text: cau SLM hoac None. now: thoi diem (s) cho nhap chop.
     uav_frac: vi tri UAV tren minimap (tu feed GPS). gps_units: don doi theo GPS thuc.
     flash: canh bao im leng — overlay do toan man hinh, khong am thanh,
-    ~100ms (3 khung @30fps)."""
+    ~100ms (3 khung @30fps). heading_deg: heading lich (goc that) — minimap xoay
+    theo huong + mũi tên N; None = North-up."""
     h, w = frame.shape[:2]
 
     draw_soldier_marker(frame, w // 2, h // 2)
@@ -158,7 +186,7 @@ def render_hud(frame, tactical_data, alert_text, now, uav_frac=(0.15, 0.18), gps
                          t.get("angle_deg", BEARING_ANGLE.get(t.get("bearing"), 90)),
                          t.get("side", "enemy"))
                         for t in tactical_data],
-                 gps_units=gps_units)
+                 gps_units=gps_units, heading_deg=heading_deg)
 
     blink_on = int(now * 2) % 2 == 0  # nhap 2Hz: 0.25s bat - 0.25s tat
     draw_alert_bar(frame, alert_text, blink_on)
