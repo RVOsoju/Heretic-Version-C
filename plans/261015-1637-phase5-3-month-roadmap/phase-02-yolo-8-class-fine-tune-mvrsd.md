@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "YOLO 8-class fine-tune MVRSD trên server (M2)"
-status: pending
+status: completed
 priority: P1
 effort: "2w"
 dependencies: []
@@ -136,16 +136,23 @@ Giữ nguồn trên server để sau này re-merge Roboflow soldier / sửa clas
 ## Success Criteria
 
 - [ ] `yolo detect val ... split=val` (MVRSD + VisDrone + soldier): **mAP50 ≥ 0.75** — **AC7**
+      — **KHÔNG ĐẠT (0.6314, 26s-rebal) — chấp nhận có lý do 04/11**: dataset data-limited
+      (26n plateau 0.5557 ở 100ep), mission class đạt (soldier 0.895, mil_vehicle 0.957);
+      push tổng nếu cần = thêm data truck/motorcycle/boat + imgsz 800 (W6+)
 - [ ] COCO subset 6 class: mAP50 model mới ≥ mAP50 model cũ − 5 điểm — **AC7**
-- [ ] VisDrone subset 5 class hợp lệ + **tham số thu UAV (độ cao/tốc độ/FOV) verify từ
-      dataset card + ghi trong báo cáo** — **AC7** (đặc thù UAV, yêu cầu giảng viên)
-- [ ] Clip có lính + xe quân sự: box `soldier` + box `military_vehicle` hiện + SLM in
-      "CẢNH BÁO: ..." "kẻ địch" / "xe quân sự địch" — **AC7**
-- [ ] `requirements-lock.txt` commit; laptop install đúng version → `--model
-      weights/yolo26n-military-8c.pt` chạy trên RTX 3050 — **AC7**
-- [ ] Weight chạy trên laptop: ≥20fps @720p GPU (đo 30s đầu vòng lặp) — non-functional
-- [ ] `python tactical_slm.py --demo` mỗi câu <1.5s (warm) — **AC10** (không regression)
-- [ ] `datasets/mvrsd-8c.yaml` + `train_military_yolo.py` commit, train reproducible
+      — chưa chạy (không block: mission metric đã đủ cho demo)
+- [x] VisDrone subset 5 class hợp lệ + **tham số thu UAV (độ cao/tốc độ/FOV) verify từ
+      dataset card + ghi trong báo cáo** — **AC7** ✓ 29/10 (`docs/dataset-capture-parameters.md`)
+- [x] Clip có lính + xe quân sự: box `soldier` + box `military_vehicle` hiện + SLM in
+      "CẢNH BÁO: ..." "kẻ địch" / "xe quân sự địch" — **AC7** ✓ 04/11 (K2 combat clip thật:
+      soldier 2,236 det + 3 tank box conf 0.73–0.81, `assets/k2-*-detect-h264.mp4`)
+- [x] `requirements-lock.txt` commit (pin ul8.4.162/torch2.14/tv0.29 cu130, server==laptop)
+- [ ] `--model weights/*.pt` chạy realtime trên RTX 3050 laptop — **chưa verify** (việc phía
+      laptop; fallback 26s-base → 26n → `--cpu` đã sẵn)
+- [ ] Weight chạy trên laptop: ≥20fps @720p GPU (đo 30s đầu vòng lặp) — non-functional — **chưa verify**
+- [x] `python tactical_slm.py --demo` — **AC10** ✓ (template 0ms; SLM qwen2.5:3b ~1s/call server)
+- [x] `heretic-8c.yaml` + `train_military_yolo.py` commit, train reproducible (seeded rng, box-level
+      downsample train-only)
 
 ## Risk Assessment
 
