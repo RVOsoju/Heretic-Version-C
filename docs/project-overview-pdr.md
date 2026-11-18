@@ -23,13 +23,14 @@ từ video trinh sát (UAV 360P+/webcam), hệ thống phát hiện + theo dõi 
 địch/đồng đội qua GPS, và cảnh báo lính qua 3 kênh — hình (box + minimap),
 **im lặng** (haptic rung khi có phần cứng — OPSEC: không lộ vị trí),
 và **câu chữ** (template 0ms; SLM optional — màn C2) — chạy thời gian thực trên laptop cá nhân,
-liên kết UAV qua **mạng riêng WiFi/4G + VPN** (không phụ thuộc hạ tầng dân dụng).
+liên kết UAV qua **mạng riêng WiFi** cho telemetry UDP (không phụ thuộc hạ tầng
+dân dụng); video đi **USB scrcp** (phone DJI Fly), không đi mạng.
 
 ## 2. Definition of done
 
 | Cột mốc | Nội dung | Trạng thái |
 |---------|----------|------------|
-| **Core (cam kết)** | **Phase 5** — tracking + mạng riêng VPN + YOLO 8 class (MVRSD) + UAV patrol/FOV + demo UAV được cấp 360P+ | = done của dự án |
+| **Core (cam kết)** | **Phase 5** — tracking + mạng riêng + YOLO 8 class (MVRSD) + UAV patrol/FOV + demo UAV được cấp 360P+ | = done của dự án |
 | **Blocked (chờ phần cứng)** | Haptic rung (chưa có module) · Phase 6: thermal Lepton + mesh đa lính + node độc lập | chỉ khi có phần cứng/tài trợ |
 
 "Đảm bảo hoàn thành target" được enforce bằng **acceptance criteria §5** —
@@ -42,7 +43,7 @@ chưa chạy được đủ AC1–AC11 (AC4 = chế độ fallback hình ảnh c
 |---|-----|----------|----|
 | S1 | **Tracking (ByteTrack)** | Real-time; track_id ổn định; tính **vận tốc + tốc độ tiếp cận**; gater chuyển key từ `(target, bearing)` sang `track_id`; **nhiều target → cảnh báo target gần nhất** (câu cảnh báo + HUD có khoảng cách m + hướng từ lính); **khoảng cách target→lính**: W2 **object-height anchor** (scale = kích thước thật class / chiều cao box, ±15–25%, không cần alt UAV) → W7 **tam giác phân GPS** (GPS UAV + alt + góc chúi + FOV + pixel → lat/lon target → 2D tới lính, ±10–15%) — model pixel-scale cố định 0.05 chỉ đúng ở độ cao ~15–22m (sai ×1.5–3 ở 30–50m) | AC1–AC3 |
 | S2 | **Kênh cảnh báo im lặng** | **Hiện tại: HUD flash + SLM (chưa có module rung).** Haptic (Arduino + motor) giữ làm mục blocked — bật lại khi có phần cứng, AC4 fallback = flash hình <100ms | AC4 |
-| S3 | **Mạng riêng WiFi/4G + VPN (WireGuard)** | **Thay LoRa** (quyết định 2026-10-15). UDP transport giữ nguyên, thêm lớp VPN; **interface `TelemetryFeed` không đổi**; link đứt → chế độ cục bộ TTL 5s (đã có `STALE_AFTER_S`) | AC5 |
+| S3 | **Mạng riêng WiFi + link loss** | **Thay LoRa** (quyết định 2026-10-15). **Re-scope 18/11: bỏ WireGuard** (không có SIM 4G, demo trong vùng phủ AP) — hotspot WPA2 riêng + UDP 8888; **interface `TelemetryFeed` không đổi**; link đứt → chế độ cục bộ TTL 5s (đã có `STALE_AFTER_S`); **video pipe scrcp**: drone → phone (DJI Fly) → USB scrcp → laptop (Mini 2 SE không có link trực tiếp laptop) | AC5 |
 | S4 | **UAV tuần tra + FOV + theo dõi** | Flycam bay theo lộ trình quanh vị trí người được bảo vệ (MAVLink qua DJI Virtual Port của Mini 2 SE nếu verify OK, nếu không = bay tay theo route gợi ý); laptop vẽ **vùng phủ camera** (cone) lên minimap; **chế độ follow: UAV bay theo vị trí mục tiêu** (sim: theo track; real: MAVLink GOTO / HUD chỉ hướng cho phi công); **indicator target trong/ngoài tầm nhìn UAV**; mode sim khi chưa bay thật | AC6 |
 | S5 | **YOLO 8 class (góc UAV)** | 8 class (chốt 2026-10-15): `person, soldier, car, motorcycle, truck, bus, boat, military_vehicle` — **gộp tất cả xe quân sự thành 1 class** (không phân tank/IFV/pháo), **loại máy bay**, **phân biệt người thường/lính**. Dataset **đặc thù UAV** (yêu cầu giảng viên 2026-10-16): MVRSD (góc drone/satellite, gộp label) + **VisDrone** (ảnh drone: person + 4 xe) + footage UAV thật tự quay (khi UAV về — gold standard, đồng thời là nguồn `soldier` B9); **tham số thu (độ cao, tốc độ, FOV) ghi vào báo cáo**; server multi-GPU; **pin version ultralytics server=laptop** | AC7 |
 | S6 | **Demo UAV (i1 Pro / Mini 2 SE, 360P+)** | Video source abstraction (webcam / RTSP / UVC / file / **scrcp phone**); hiệu chỉnh YOLO cho input 360P; chạy demo end-to-end bằng UAV thật | AC8 |
@@ -62,7 +63,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 
 ## 4. Scope OUT (đoạn rõ để tránh phình)
 
-- **LoRa** — thay bằng WiFi/4G + VPN (quyết định 2026-10-15).
+- **LoRa** — thay bằng WiFi riêng (quyết định 2026-10-15); **WireGuard** — bỏ 18/11 (không có SIM 4G, demo trong vùng phủ AP; kiến trúc trong suốt transport — thêm WG sau chỉ là config).
 - **E88 Pro** — không có ngân sách; dùng **UAV được cấp** thay thế.
 - **Haptic module** — blocked (chưa có phần cứng); cảnh báo im lặng hiện tại = flash hình + câu chữ.
 - Mesh đa lính / node RPi–Jetson / NPU trên UAV — **Tier C** (kiến trúc mesh-ready: model `Track`, `TelemetryFeed` là điểm hội tụ).
@@ -80,7 +81,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 | AC2 | Tốc độ tiếp cận | Cùng script, so vel tính được với ground truth sim (W2: scale object-height anchor; W7: re-verify trên sim UAV bay vòng + tam giác phân GPS) | Sai <10% |
 | AC3 | Gater theo track_id + target gần nhất | `test_telemetry_chain.py` (update): mục tiêu cắt ngưỡng 100m một lần; payload 3 target → chọn gần nhất | Báo đúng 1 lần, không lặp; câu cảnh báo có **khoảng cách + hướng** của target gần nhất |
 | AC4 | Cảnh báo im lặng | **Fallback:** gater trigger → HUD flash; (haptic khi có phần cứng: decide→rung <200ms) | Flash <100ms, **không phát âm** |
-| AC5 | Mạng riêng VPN | Bench 2 node qua WiFi + WireGuard: HUD nhận position 1Hz; cắt link mô phỏng đứt | Bench: sai <1m so sim; đứt link → local mode sau ≤5s, không crash |
+| AC5 | Mạng riêng + link loss | Bench 2 node qua hotspot riêng + UDP 8888: HUD nhận position 1Hz; cắt link mô phỏng đứt | Bench: sai <1m so sim; đứt link → local mode sau ≤5s, không crash |
 | AC6 | UAV patrol + FOV + follow | `--sim` với lộ trình waypoints + mục tiêu di động (bay thật ở M4) | Cone FOV đúng hướng; **UAV sim bay theo vị trí mục tiêu (follow mode)**; indicator trong/ngoài tầm nhìn đúng |
 | AC7 | YOLO 8 class (góc UAV) | `yolo val` trên val (MVRSD + VisDrone + soldier) + 1 clip demo có lính + xe quân sự | mAP50 ≥ 0,75; soldier + military_vehicle được box + SLM cảnh báo; **mAP 6 class COCO không giảm >5%**; weight chạy trên 3050 (cùng version ultralytics); **tham số thu (độ cao/tốc độ/FOV) ghi trong báo cáo** |
 | AC8 | UAV demo live | Video 360P+ từ UAV (i1 Pro / Mini 2 SE) → HUD | ≥15fps; người trong khung → cảnh báo <2s |
@@ -111,7 +112,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
    khoảng cách (m) + hướng từ lính đến địch (tam giác phân GPS từ UAV, ±10–15%;
    vị trí lính từ GPS 1Hz).
 6. Lính đồng đội (GPS giả) hiện chấm xanh trên minimap, không bị cảnh báo.
-7. Rút link mạng riêng (tắt VPN/WiFi UAV) → HUD chuyển local mode sau 5s, không crash.
+7. Cắt mạng node telemetry (tắt WiFi node) → HUD chuyển local mode sau 5s, không crash.
 8. (Bay thật) UAV đổi waypoint / GOTO mục tiêu, FOV di chuyển theo.
 
 ## 8. Ngân sách & mốc thời gian (3 tháng = 12 tuần)
@@ -122,7 +123,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 **Mốc (plan chi tiết từng tuần: `plans/261015-1637-phase5-3-month-roadmap/`):**
 - M1 (tuần 1–2) tracking + gater track_id → AC1–AC3
 - M2 (tuần 3–4) fine-tune MVRSD + VisDrone (góc UAV) trên server → AC7
-- M3 (tuần 5–6) mạng riêng VPN + tích hợp camera 360P UAV → AC5, AC8 (nửa)
+- M3 (tuần 5–6) mạng riêng (hotspot + UDP) + link loss + video scrcp + camera 360P → AC5, AC8 (nửa)
 - M4 (tuần 7–8) FOV/patrol + tích hợp full + degradation modes → AC6, AC8
 - M5 (tuần 9–12) field test + demo E2E + tài liệu đồ án + buffer → AC9–AC11
 
@@ -134,7 +135,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 | Chất lượng detection trên 360P (người 20m chỉ ~40–60 px) | Chạy model hiện tại trên frame 360P mẫu ở tuần 1; hiệu chỉnh input size/NMS ở M3 |
 | MVRSD tải qua Baidu — server có thể không truy cập | Verify tuần 3; fallback: AMAD/InvictusRex (GitHub release) |
 | Fine-tune 8 class degrade 6 class COCO cũ | Fine-tune trộn MVRSD + COCO; AC7 yêu cầu mAP COCO không giảm >5% |
-| VPN trên thiết bị UAV node chưa rõ chạy được gì | WireGuard có build ESP32 (esp_wireguard) và Linux; chọn theo thiết bị thực tế ở M3 |
+| Capture scrcp (mirror màn phone) fps/latency trên Windows có thể yếu | Đo pipeline W5 bằng clip K2 trên phone; fallback: app capture / vòng screencap / replay video 360P qua file (PDR §7) |
 | UAV không hỗ trợ MAVLink/GCS | S4 fallback: bay tay theo route gợi ý trên map + FOV + HUD chỉ hướng cho follow — vẫn đạt AC6 (sim + bay thật) |
 | VisDrone license / tham số thu chưa verify | Verify license + độ cao thu ở W3; fallback: MVRSD + COCO + footage tự quay (ghi trade-off trong báo cáo) |
 | **alt/FOV của UAV được cấp chưa biết** (input tam giác phân GPS) | B1: đo khi UAV về (bay 30m, marker 10m, đếm pixel) + verify alt; sim nominal h=30m, FOV 60° tới đó; re-verify trước W9 |

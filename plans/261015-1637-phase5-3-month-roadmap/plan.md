@@ -1,6 +1,6 @@
 ---
-title: "Heretic C Phase 5 - 3-month roadmap (no budget, WiFi/4G VPN, 360P UAV)"
-description: "Lộ trình 12 tuần cho đồ án Heretic C: tracking + YOLO 8 class + mạng riêng VPN + UAV 360P + demo E2E, ngân sách 0 đồng mua mới."
+title: "Heretic C Phase 5 - 3-month roadmap (no budget, WiFi private, 360P UAV)"
+description: "Lộ trình 12 tuần cho đồ án Heretic C: tracking + YOLO 8 class + mạng riêng + UAV 360P + demo E2E, ngân sách 0 đồng mua mới."
 status: in-progress
 priority: P1
 effort: "12w"
@@ -36,14 +36,14 @@ không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ 
 | **W2 ✓** | 26/10–01/11 | **✓ DONE 26/10 (W2d1–d5):** object-height anchor (`tactical_height_anchor.py` — scale/class + fallback 0.05, `make_sim_frame` vật lý 30m/FOV60°) + flash HUD (3 khung @30fps, không âm) + `test_tracking.py` (150 khung, YOLO26n + ByteTrack thật) + AC3 vào `test_telemetry_chain.py` → **M1 done** | ✓ AC1: 150/150 khung, re-ID **0.0%** · AC2: 2.32 vs 2.29 m/s (**sai 1.2%**) · anchor 1.2–1.3% (<25%) · AC3: 105→95m cùng track = 1 cảnh báo, 3 target → chọn 42m · AC4: flash ≈100ms · 20/20 + 7/7 checks PASS |
 | **W3** | 02/11–08/11 | **✓ Prep data XONG SỚM 27–28/10:** MVRSD 13,582 ảnh (mirror InvictusRex → **B5 đóng**) + VisDrone 9,209 ảnh có label + Mendeley 7,985 ảnh (fix 782 label thiếu newline) + **COCO boat 3,025 ảnh (cat_id 9, `prepare_coco_boat_subset.py`)** — tải + verify hết; **heretic-8c hợp nhất: 33,221 ảnh, 8 class đầy đủ** (`prepare_heretic_8c_dataset.py`, visual check 6/6); B9-Mendeley verify xong (CC BY 4.0, spot-check + render) | `heretic-8c.yaml` hợp lệ 33,221 ảnh, 0 malformed, boat = 10,576 boxes ✓ 28/10; **bảng tham số thu 4 nguồn ✓ 29/10** (`docs/dataset-capture-parameters.md`); còn: log sheet footage tự quay (khi đi quay); Roboflow backup (token, không block) |
 | **W4 ✓** | 09/11–15/11 | **✓ DONE SỚM 30/10–04/11 (W4d1–d5):** fine-tune 8c: 26n-100ep mAP50 0.5557 (plateau, data-limited) → escalate **26s-rebal 100ep = 0.6314** (soldier **0.895**, mil_vehicle **0.957**); K2 combat clip thật: soldier 2,236 det + 3 tank box conf 0.73–0.81; SLM 8c (DANGEROUS_TARGETS −person) + `--model`; K2 domain finetune 11/10 (`k2-cp`). **Gate mAP50 ≥0.75 KHÔNG đạt (0.631) — chấp nhận có lý do** (data-limited, mission class đạt — report W4) | mission class đạt (soldier/mil_vehicle); **laptop FPS verify ✓ 18/11: 13–17fps @720p K2 (peak 21) trên 4GB** — AC8 (≥15@360P) dự kiến vượt, re-measure 360P ở W6; TensorRT engine = booster tùy chọn phía laptop · report `weekly-261104-w4-report.md` |
-| **W5** | 16/11–22/11 | **Sim-first**: dựng bench 2 node (laptop + node 2) + WireGuard, `udp_position_sender.py` — không phụ thuộc UAV | `wg show` 2 peer active; ping <20ms; `test_vpn_link.py` PASS (AC5 phần bench) |
+| **W5** | 16/11–22/11 | **Re-scope 18/11 (user chốt — bỏ WireGuard, không có SIM 4G)**: hotspot WPA2 riêng + UDP 8888 + `udp_position_sender.py` + **link-loss drill** (≤5s local, không crash) + **test pipe scrcp** (phone→laptop→capture frame — clip K2 trên phone, không cần UAV) | `test_link_loss.py` PASS (AC5); capture frame scrcp đạt fps dùng được |
 | **W6** | 23/11–29/11 | Video source abstraction (`--source webcam/rtsp/uvc/file`); hiệu chỉnh YOLO cho 360P → **M3 done** | ≥15fps @360P; người trong khung → cảnh báo <2s (nửa AC8) |
 | **W7** | 30/11–06/12 | **Badge target trong/ngoài tầm nhìn** (cone visual trên minimap đã BỎ theo user 11/16 — minimap hiện = radar heading-up + mũi tên N + `--heading`; FOV indicator giữ dạng text badge) + tuần tra + **chế độ follow target** (MAVLink qua DJI Virtual Port nếu verify OK, nếu không = route gợi ý tay + HUD chỉ hướng) + **tam giác phân GPS** (`tactical_geolocation.py`: pose UAV + pixel → lat/lon target; `alt` vào payload UDP; đo FOV → B1) | `--sim` lộ trình waypoint: **UAV bay theo vị trí mục tiêu**, **khoảng cách target→lính sai <15%** so ground truth (AC6 sim) |
-| **W8** | 07/12–13/12 | Tích hợp full: telemetry qua VPN, 3 chế độ degradation (full/position-only/local), link-loss test → **M4 done** | AC6 (bay thật nếu được, nếu không sim+bench); AC8: 10 phút live ổn định; cắt link → local ≤5s không crash |
+| **W8** | 07/12–13/12 | Tích hợp full: telemetry qua mạng riêng, 3 chế độ degradation (full/position-only/local), link-loss test → **M4 done** | AC6 (bay thật nếu được, nếu không sim+bench); AC8: 10 phút live ổn định; cắt link → local ≤5s không crash |
 | **W9** | 14/12–20/12 | Field test 1 với UAV demo (Mini 2 SE; i1 Pro nếu chưa kịp) — 5 kịch bản, ghi log + video | Log: 5/5 kịch bản chạy, issue list đã triage (critical/minor) |
 | **W10** | 21/12–27/12 | Stress: VRAM 4GB, link loss, latency + fix | AC9: <3.8GB/30s, OOM → `--cpu` khởi động lại OK; 5 vòng cắt/ghép link ≤5s |
 | **W11** | 28/12–03/01 | Demo end-to-end 10 phút (kịch bản PDR §7) + 2 buổi rehearsal | AC11: 1 lượt chạy không interrupt, có ghi hình; re-verify AC1–AC11 |
-| **W12** | 04/01–10/01 | Tài liệu đồ án (cập nhật `docs/`, báo cáo cuối) + buffer | `docs/` đồng bộ (deployment + VPN, PDR status, BOM status); báo cáo đồ án đủ bảng kết quả AC1–AC11 |
+| **W12** | 04/01–10/01 | Tài liệu đồ án (cập nhật `docs/`, báo cáo cuối) + buffer | `docs/` đồng bộ (deployment + mạng riêng, PDR status, BOM status); báo cáo đồ án đủ bảng kết quả AC1–AC11 |
 
 **Ngoài plan (11/16–18):** TensorRT export script (engine build + FPS test = phía laptop, user) ·
 minimap radar heading-up + `--heading` (độ la bàn) + mũi tên N — sẵn chờ module GY-85 (user mua;
@@ -53,7 +53,7 @@ Plan `261116-1156-tensorrt-minimap-radar` (completed).
 ## Sơ đồ hệ thống
 
 ```
-                    MẠNG RIÊNG (WiFi/4G) + WireGuard
+                    MẠNG RIÊNG (WPA2 WiFi) + UDP 8888
   ┌────────────────────────────┐          ┌─────────────────────────────────────────────┐
   │  UAV DEMO                  │          │  LAPTOP C2 — TUF F15 (RTX 3050 4GB, Win11)  │
   │  i1 Pro (tập) / Mini 2 SE  │  video   │                                             │
@@ -97,7 +97,7 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 | AC2 | Tốc độ tiếp cận | Cùng script, so với ground truth sim | Sai <10% |
 | AC3 | Gater theo track_id + target gần nhất | `test_telemetry_chain.py` (update) | Cắt ngưỡng 100m 1 lần → báo đúng 1 lần; 3 target → SLM chọn gần nhất, câu có khoảng cách + hướng |
 | AC4 | Cảnh báo im lặng (fallback) | gater trigger → HUD flash | Flash <100ms, không phát âm |
-| AC5 | Mạng riêng VPN | `test_vpn_link.py`: 2 node WiFi + WireGuard | HUD nhận position 1Hz, sai <1m so sim; đứt link → local ≤5s, không crash |
+| AC5 | Mạng riêng + link loss | `test_link_loss.py`: 2 node qua hotspot + UDP 8888 | HUD nhận position 1Hz, sai <1m so sim; đứt link → local ≤5s, không crash |
 | AC6 | UAV patrol + FOV + follow | `--sim` lộ trình waypoints + target di động (bay thật ở W8) | Cone FOV đúng hướng; **UAV sim bay theo vị trí target**; badge trong/ngoài tầm nhìn đúng |
 | AC7 | YOLO 8 class (góc UAV) | `yolo val` val MVRSD+VisDrone + 1 clip có lính + xe quân sự | mAP50 ≥0.75; `soldier` + `military_vehicle` được box + SLM cảnh báo; mAP 6 COCO giảm ≤5 điểm; weight chạy trên 3050 (pin version ultralytics server=laptop); **tham số thu (độ cao/tốc độ/FOV) ghi báo cáo** |
 | AC8 | UAV được cấp live | Video 360P+ → HUD | ≥15fps; người trong khung → cảnh báo <2s |
@@ -111,7 +111,7 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 |-------|------|--------|
 | 1 | [Tracking and gater track_id](./phase-01-tracking-and-gater-track-id.md) | **Done** (W1 ✓ 19/10, W2 ✓ 26/10 — AC1–AC4 + anchor; còn item UAV về tay trước W9 = B1–B3) |
 | 2 | [YOLO 8-class fine-tune MVRSD](./phase-02-yolo-8-class-fine-tune-mvrsd.md) | **Done** (W4 ✓ sớm 30/10–04/11 — 26s-rebal mAP50 0.6314, mission class soldier 0.895 / mil_vehicle 0.957; gate 0.75 miss đã chấp nhận có lý do) |
-| 3 | [Private network VPN and 360P camera](./phase-03-private-network-vpn-and-360p-camera.md) | Pending |
+| 3 | [Mạng riêng + link loss + video scrcp + camera 360P](./phase-03-private-network-vpn-and-360p-camera.md) | Pending |
 | 4 | [FOV patrol and integration](./phase-04-fov-patrol-and-integration.md) | Pending |
 | 5 | [Field test demo and docs](./phase-05-field-test-demo-and-docs.md) | Pending |
 
@@ -120,7 +120,7 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 - **P1 → P4** — tracking feed cho integration; kết quả 360P (B6 bước 1) định hướng tune W6.
 - **P2 độc lập với P1** — chạy song song trên server (W3–W4), không đụng file của P1.
 - **P2 → P5** — model 8 class dùng trong demo W11.
-- **P3 → P4** — integration cần VPN + camera 360P đã có.
+- **P3 → P4** — integration cần mạng riêng + camera 360P đã có.
 - **P4 → P5** — field test/demo trên hệ tích hợp xong.
 - **Ngoại bộ:** UAV demo — i1 Pro **đã có tay 23/10 (chim tập)**; Mini 2 SE **chưa có** (user mua riêng) — gate B1–B3 còn lại (đo FOV/alt + verify DJI Virtual Port) khi Mini 2 SE về tay; chỉ block khối W5–W8 (bay thật W8/W9), **W1–W4 không bị block** (sim-first); quyền truy cập Baidu (gate B5, khối W4); nguồn ảnh `soldier` (gate B9, khối W4 train).
 

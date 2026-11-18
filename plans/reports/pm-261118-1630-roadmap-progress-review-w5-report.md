@@ -16,7 +16,7 @@
 
 | Tuần | Ngày | Việc | Trạng thái |
 |------|------|------|------------|
-| **W5** | 16/11–22/11 | Bench 2 node + WireGuard + `udp_position_sender.py` + `test_vpn_link.py` (AC5) | **CHƯA BẮT ĐẦU (tuần hiện tại)** |
+| **W5** | 16/11–22/11 | **Re-scope 18/11 (user chốt, bỏ WireGuard)**: hotspot WPA2 + UDP 8888 + `udp_position_sender.py` + `test_link_loss.py` (AC5) + link-loss drill + **test pipe scrcp** (clip K2 trên phone) | **CHƯA BẮT ĐẦU (tuần hiện tại)** |
 | W6 | 23/11–29/11 | `--source` webcam/rtsp/uvc/file + tune 360P (nửa AC8) | Chưa |
 | W7 | 30/11–06/12 | Badge FOV (cone visual đã bỏ 11/16) + patrol + follow + tam giác phân GPS (AC6) | Chưa |
 | W8 | 07/12–13/12 | Tích hợp full 3 chế độ degradation (M4) | Chưa |
@@ -30,15 +30,16 @@
 1. **Mini 2 SE chưa mua** — gate B1–B3 + W9; cần về tay **trước 14/12** (~4 tuần).
 2. **GY-85 (la bàn)** — user mua; phía code đã sẵn (`--heading`).
 3. **Laptop (việc user):** verify realtime FPS 26s-k2-cp @4GB · build TensorRT engine · (W4d4 carry).
-4. **Retrain 26n 100ep (16/11) mất dấu** — không process, không weight, không log sau epoch 1 → cần xác nhận có cần chạy lại không (26n chỉ là fallback; weight demo = 26s-k2-cp).
+4. ~~Retrain 26n 100ep (16/11) mất dấu~~ — **ĐÃ GIẢI QUYẾT 18/11**: run 100ep thật **chạy xong 30/10** (log `train_yolo26n_8c_100ep_261030.log` kết thúc mAP50 0.5557 + results.csv 100 epoch + weight 18/46). Launch 16/11 là bản duplicate chết sau epoch 1 — không cần chạy lại.
 5. **False positive tarp→boat/soldier/mil-vehicle** — domain gap; fix = hard-negative mining (chưa làm).
 6. **bus↔boat lẫn @360p** — known issue.
 7. **mAP50 gate 0.75 miss (0.631)** — đã chấp nhận có lý do; nếu giảng viên ép: thêm data truck/motorcycle/boat + imgsz 800.
 
 ## Sync-back đã làm
-- `plan.md`: W4 ✓ + Phase 2 → Done + ghi chú W7 (cone bỏ) + mục "Ngoài plan 11/16–18".
-- `phase-02`: status → completed + success criteria đánh dấu theo số đo thực.
+- `plan.md`: W4 ✓ + Phase 2 → Done + ghi chú W7 (cone bỏ) + mục "Ngoài plan 11/16–18" + **laptop FPS ✓ 18/11 (13–17, peak 21)** + **W5 re-scope (bỏ WireGuard)** + AC5 table + title/description.
+- `phase-02`: status → completed + success criteria đánh dấu theo số đo thực (kể cả laptop FPS 18/11).
+- `phase-03` (W5–W6): viết lại theo scope mới — hotspot + UDP + link-loss + **scrcp** (không WG); `--source` thêm kind `scrcp`; test file `test_vpn_link.py` → `test_link_loss.py`; docs `network-setup-wireguard.md` → `network-setup.md`.
+- `docs/project-overview-pdr.md`: S3 + AC5 + scope OUT (WG bỏ 18/11) + §1/§2 + scenario §7 step 7 + risk table (WG → scrcp capture).
 
 ## Unresolved questions
-- Retr 26n 100ep (16/11): chạy lại không, hay bỏ (26s là weight demo)?
-- W5: node 2 dùng máy nào (laptop 2 / điện thoại Termux)?
+- W5: node 2 (device phát UDP) dùng máy nào — điện thoại / laptop 2?
