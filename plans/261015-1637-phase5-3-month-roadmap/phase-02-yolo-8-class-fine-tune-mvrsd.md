@@ -147,9 +147,10 @@ Giữ nguồn trên server để sau này re-merge Roboflow soldier / sửa clas
       "CẢNH BÁO: ..." "kẻ địch" / "xe quân sự địch" — **AC7** ✓ 04/11 (K2 combat clip thật:
       soldier 2,236 det + 3 tank box conf 0.73–0.81, `assets/k2-*-detect-h264.mp4`)
 - [x] `requirements-lock.txt` commit (pin ul8.4.162/torch2.14/tv0.29 cu130, server==laptop)
-- [ ] `--model weights/*.pt` chạy realtime trên RTX 3050 laptop — **chưa verify** (việc phía
-      laptop; fallback 26s-base → 26n → `--cpu` đã sẵn)
-- [ ] Weight chạy trên laptop: ≥20fps @720p GPU (đo 30s đầu vòng lặp) — non-functional — **chưa verify**
+- [x] `--model weights/*.pt` chạy realtime trên RTX 3050 laptop — ✓ 18/11 (user đo clip K2 thật:
+      **13–17fps, peak 21** @720p trên 4GB; fallback 26s-base → 26n → `--cpu` + TensorRT booster)
+- [ ] Weight chạy trên laptop: ≥20fps @720p GPU — **đạt biên** (13–17, peak 21); ngưỡng AC8 thật là
+      ≥15@**360P** (nhẹ hơn) → re-measure 360P ở W6; nếu cần thêm: TensorRT engine
 - [x] `python tactical_slm.py --demo` — **AC10** ✓ (template 0ms; SLM qwen2.5:3b ~1s/call server)
 - [x] `heretic-8c.yaml` + `train_military_yolo.py` commit, train reproducible (seeded rng, box-level
       downsample train-only)
