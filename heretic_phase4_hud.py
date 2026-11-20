@@ -27,6 +27,7 @@ from tactical_hud_renderer import WARN_RANGE_M, render_hud
 from tactical_slm import TacticalAlertGater, call_ollama, evaluate_alert
 from tactical_telemetry_feed import TelemetryFeed, is_friendly_by_gps, read_soldier_gps
 from tactical_tracker import TrackStore
+from tactical_video_source import open_video_source
 
 FRAME_WIDTH = 1280
 FRAME_HEIGHT = 720
@@ -170,6 +171,13 @@ def main():
                              "duoc: weights/yolo26s-military-8c-k2.pt hoac .engine tu export_trt_engine.py)")
     parser.add_argument("--video", metavar="PATH",
                         help="Test voi video file thay vi webcam (vd: assets/bus-360p.mp4, clip UAV thuc)")
+    parser.add_argument("--source", choices=["webcam", "rtsp", "uvc", "file", "window"],
+                        default="webcam",
+                        help="Loai nguon video (mac dinh webcam; window = capture window mirror "
+                             "AirPlayReceiver/scrcp theo title — Windows only)")
+    parser.add_argument("--source-url", default="0",
+                        help="URL cua nguon video: index webcam / RTSP / duong dan / title window "
+                             "(mac dinh '0'; vi du: --source window --source-url AirPlay)")
     parser.add_argument("--heading", type=float, metavar="DEG",
                         help="Heading cua lich, do la ban (0=Bac, 90=Dong, dong chieu kim dong ho) — "
                              "minimap xoay theo huong + ve mũi tên N (mac dinh: North-up)")
@@ -242,12 +250,17 @@ def main():
         except Exception as exc:
             print(f"[CANH CAO] SLM chua san sang (Ollama chua chay?) — de duoc cai template: {exc}")
 
-    # webcam (mac dinh) hoac video file (--video) de test clip thuc
-    src = args.video if args.video else 0
-    cap = cv2.VideoCapture(src)
-    if not args.video:  # chi set resolution voi webcam; video giu resolution goc
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
+    # Nguon video: --video (tuong thoi file) > --source/--source-url > webcam 0
+    if args.video:
+        cap = open_video_source("file", args.video)
+        print(f"[VIDEO] Nguon: file {args.video}")
+    elif args.source == "webcam" and args.source_url == "0":
+        # chi set resolution voi webcam; cac nguon khac giu kich thuoc goc
+        cap = open_video_source("webcam", "0", FRAME_WIDTH, FRAME_HEIGHT)
+        print(f"[VIDEO] Nguon: webcam 0 ({FRAME_WIDTH}x{FRAME_HEIGHT})")
+    else:
+        cap = open_video_source(args.source, args.source_url)
+        print(f"[VIDEO] Nguon: {args.source} '{args.source_url}'")
     print("🔥 [HERETIC C - PHASE 4] HUD san sang. Bam 'q' de thoat.")
 
     yolo_device = "cpu" if args.cpu else (0 if torch.cuda.is_available() else "cpu")

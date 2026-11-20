@@ -31,6 +31,13 @@ theo title) + hiệu chỉnh YOLO cho 360P (nửa AC8).
 minimap = mô phỏng qua UDP 8888 (limitation ghi trong báo cáo). `TelemetryFeed`
 interface (UDP 8888, JSON `{id,lat,lon,t}`) **không đổi 1 dòng**.
 
+**Code 19/11 ✓** (server): `udp_position_sender.py` + `test_link_loss.py` (7/7,
+code-reviewed — 1 Important + 2 Minor đã fix) + `network-setup.md` (bản AirPlay + iSH)
++ `tactical_video_source.py` (5 kinds, window = mss+pywin32) + `bench_window_capture.py`
++ `--source`/`--source-url` wire vào `heretic_phase4_hud.py` (smoke: file kind OK,
+pipeline chạy tới display boundary). **Còn laptop (23/11):** W5d1 hotspot + W5d5 bench
+AirPlay + drill → số liệu → AC5; W6d3 tune 360P + đo ≥15fps + cảnh báo <2s → M3.
+
 ## Requirements
 
 **Functional**
