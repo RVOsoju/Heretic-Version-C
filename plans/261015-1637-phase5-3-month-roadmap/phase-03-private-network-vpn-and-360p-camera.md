@@ -18,9 +18,13 @@ demo nằm trong vùng phủ 1 AP; kiến trúc trong suốt transport — thêm
 (chốt 23/10).
 
 W5: hotspot WPA2 riêng + UDP 8888 (`udp_position_sender.py` + `test_link_loss.py`)
-+ **link-loss drill** (≤5s local, không crash) + **test pipe scrcp** (clip K2 trên
-phone → laptop → capture frame — không cần UAV). W6: video source abstraction
++ **link-loss drill** (≤5s local, không crash) + **test pipe scrcp qua WiFi**
+(`adb connect` qua hotspot — phi công đứng xa, không cable; clip K2 trên phone,
+không cần UAV). W6: video source abstraction
 (`--source webcam/rtsp/uvc/file/scrcp`) + hiệu chỉnh YOLO cho 360P (nửa AC8).
+**Quyết định 19/11: scrcp WiFi-only** (loại USB/Bluetooth) → mạng riêng giờ là
+**critical path** (mang video + telemetry) → bench W5 = bench chất lượng mạng
+(fps ổn định, packet loss, latency, tải đồng thời 2 dòng).
 **Vị trí GPS drone không trích được** (không có SDK Mini 2 SE) → chấm UAV trên
 minimap = mô phỏng qua UDP 8888 (limitation ghi trong báo cáo). `TelemetryFeed`
 interface (UDP 8888, JSON `{id,lat,lon,t}`) **không đổi 1 dòng**.
@@ -34,8 +38,10 @@ interface (UDP 8888, JSON `{id,lat,lon,t}`) **không đổi 1 dòng**.
   di chuyển, biết ground truth) — thay firmware ESP32 nếu không có phần cứng (B4).
 - Link đứt → `TelemetryFeed` tự chuyển local sau ≤5s (`STALE_AFTER_S`,
   `tactical_telemetry_feed.py:23`), không crash.
-- **Video pipe scrcp**: phone (DJI Fly / video) → USB scrcp → laptop → Python
-  capture frame được ở fps dùng được (test bằng clip K2 trên phone — không cần drone).
+- **Video pipe scrcp qua WiFi**: phone (DJI Fly / video) → **scrcp TCP**
+  (`adb connect <ip-phone>:5555` qua hotspot) → laptop → Python capture frame
+  được ở fps dùng được (test bằng clip K2 trên phone — không cần drone).
+  USB chỉ dùng lúc bật USB debugging lần đầu.
 - `--source {webcam|rtsp|uvc|file|scrcp}` + `--source-url` cho mọi nguồn video (W6).
 - 360P: ≥15fps trên RTX 3050; người trong khung → cảnh báo <2s.
 
@@ -46,14 +52,17 @@ interface (UDP 8888, JSON `{id,lat,lon,t}`) **không đổi 1 dòng**.
 ## Architecture
 
 ```
-Drone (Mini 2 SE) ──OcuSync──► phone (DJI Fly) ──USB scrcp──► laptop:
+Drone (Mini 2 SE) ──OcuSync 5.8GHz──► phone (DJI Fly)
+Phone ──scrcp TCP (adb connect qua hotspot WPA2)──► laptop:
                                             capture frame (mss) ──► cv2 frame ──► HUD
-Node telemetry (phone / laptop 2 / ESP32) ──UDP 8888 (hotspot WPA2 riêng)──► laptop
+Node telemetry (phone / laptop 2 / ESP32) ──UDP 8888 (cùng hotspot)──► laptop
 GPS drone: không trích được (không SDK) → udp_position_sender mô phỏng (chấm UAV)
 ```
 
-Quy tắc: **mọi thứ đổ về UDP 8888 như cũ** — `TelemetryFeed`
-(`tactical_telemetry_feed.py:31-82`) không đổi. Video đi USB, không đi mạng.
+Quy tắc: **mọi thứ đổ về hotspot WPA2 riêng** — `TelemetryFeed`
+(`tactical_telemetry_feed.py:31-82`) không đổi; scrcp và UDP 8888 chạy song song
+trên cùng 1 mạng. **Tách băng tần**: OcuSync ép 5.8GHz (DJI Fly), hotspot
+Windows chỉ phát 2.4GHz → không tranh sóng.
 
 ## Related Code Files
 
@@ -84,9 +93,11 @@ Quy tắc: **mọi thứ đổ về UDP 8888 như cũ** — `TelemetryFeed`
 3. **W5d3** — `test_link_loss.py`: HUD nhận position 1Hz, sai <1m so sim → PASS.
 4. **W5d4** — **link-loss drill**: tắt WiFi node → assert `feed.fresh("uav")`
    = None sau ≤5s, HUD không crash.
-5. **W5d5** — **test scrcp**: clip K2 trên phone (không cần drone) → scrcp USB →
-   laptop; capture frame bằng Python (mss/directscreen) → đo fps dùng được;
-   ghi kết quả → input thiết kế `--source scrcp` cho W6.
+5. **W5d5** — **test scrcp qua WiFi (bench chất lượng mạng)**: clip K2 trên phone
+   (không cần drone) → `adb connect` qua hotspot → laptop; capture frame bằng
+   Python (mss) → đo: fps video ổn định, packet loss, latency, **chạy đồng thời
+   UDP 8888** (đúng điều kiện demo); nếu có i1 Pro → bay thật thay clip (mạnh hơn).
+   Ghi kết quả → input thiết kế `--source scrcp` cho W6.
 6. **W6d1** — tạo `tactical_video_source.py`: 5 kind (webcam/rtsp/uvc/file/scrcp);
    RTSP dùng `cv2.CAP_FFMPEG` + `CAP_PROP_BUFFERSIZE=1`; in fps thực đo sau 100 khung.
 7. **W6d2** — `heretic_phase4_hud.py`: thêm `--source`/`--source-url`; thay `:193-195`;
@@ -100,8 +111,9 @@ Quy tắc: **mọi thứ đổ về UDP 8888 như cũ** — `TelemetryFeed`
 - [ ] Hotspot WPA2 riêng: laptop + node cùng AP; ping 2 chiều <20ms
 - [ ] `python test_link_loss.py` PASS: HUD nhận position 1Hz qua mạng riêng, sai <1m
       so sim; cắt link → local mode ≤5s, không crash — **AC5**
-- [ ] **Pipe scrcp**: clip K2 trên phone → laptop → Python capture frame fps dùng
-      được — **AC8** (đường đi)
+- [ ] **Pipe scrcp qua WiFi**: clip K2 trên phone → `adb connect` hotspot →
+      laptop → Python capture frame fps dùng được, **đồng thời UDP 8888 không
+      degrade** — **AC8** (đường đi)
 - [ ] `python heretic_phase4_hud.py --source scrcp` (hoặc `file`/`webcam`) chạy
       **≥15fps @360P** — **AC8** (nửa)
 - [ ] Người trong khung 360P → cảnh báo HUD <2s (đo timestamp log) — **AC8** (nửa)
@@ -112,7 +124,9 @@ Quy tắc: **mọi thứ đổ về UDP 8888 như cũ** — `TelemetryFeed`
 
 | Rủi ro | Mitigation |
 |--------|-----------|
-| Capture scrcp (window mirror) fps/latency yếu trên Windows | W5d5 đo sớm (clip K2 trên phone); fallback: app capture xuất khung trực tiếp, hoặc vòng `adb exec-out screencap` (fps thấp hơn); không đạt → PDR §7 cho phép replay video 360P qua `file` |
+| **Hotspot Windows chỉ phát 2.4GHz** — tranh sóng với OcuSync 2.4GHz | Ép link drone sang **5.8GHz** trong DJI Fly; verify W5d5 (bay i1 Pro + đo chất lượng video); fallback: router có sẵn làm AP 5GHz / USB scrcp khi phi công cùng chỗ |
+| **Hotspot Windows drop client / yếu khi mang tải video** (critical path) | W5d5 đo sớm dưới tải đồng thời (video + UDP); fallback: router có sẵn làm AP; không đạt → PDR §7 cho phép replay video 360P qua `file` |
+| Capture scrcp (window mirror) fps/latency yếu trên Windows | W5d5 đo sớm (clip K2 trên phone); fallback: app capture xuất khung trực tiếp; không đạt → replay file |
 | RTSP lag/đứt (nếu sau này có source RTSP thật) | `rtsp_transport;tcp`, buffer size 1; chấp nhận delay 1–2s và công khai trong đồ án |
 | Không có 4G SIM (B7) | WiFi-only; demo site trong vùng phủ AP — **chốt 18/11: bỏ WireGuard, không 4G** |
 | 360P <15fps | đóng app nặng, tắt hardware acceleration trình duyệt; nếu vẫn chưa đủ → `imgsz=480` + ghi nhận trade-off chất lượng |
