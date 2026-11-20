@@ -36,7 +36,7 @@ không thermal. TelemetryFeed interface (UDP 8888, JSON `{id,lat,lon,t}`) giữ 
 | **W2 ✓** | 26/10–01/11 | **✓ DONE 26/10 (W2d1–d5):** object-height anchor (`tactical_height_anchor.py` — scale/class + fallback 0.05, `make_sim_frame` vật lý 30m/FOV60°) + flash HUD (3 khung @30fps, không âm) + `test_tracking.py` (150 khung, YOLO26n + ByteTrack thật) + AC3 vào `test_telemetry_chain.py` → **M1 done** | ✓ AC1: 150/150 khung, re-ID **0.0%** · AC2: 2.32 vs 2.29 m/s (**sai 1.2%**) · anchor 1.2–1.3% (<25%) · AC3: 105→95m cùng track = 1 cảnh báo, 3 target → chọn 42m · AC4: flash ≈100ms · 20/20 + 7/7 checks PASS |
 | **W3** | 02/11–08/11 | **✓ Prep data XONG SỚM 27–28/10:** MVRSD 13,582 ảnh (mirror InvictusRex → **B5 đóng**) + VisDrone 9,209 ảnh có label + Mendeley 7,985 ảnh (fix 782 label thiếu newline) + **COCO boat 3,025 ảnh (cat_id 9, `prepare_coco_boat_subset.py`)** — tải + verify hết; **heretic-8c hợp nhất: 33,221 ảnh, 8 class đầy đủ** (`prepare_heretic_8c_dataset.py`, visual check 6/6); B9-Mendeley verify xong (CC BY 4.0, spot-check + render) | `heretic-8c.yaml` hợp lệ 33,221 ảnh, 0 malformed, boat = 10,576 boxes ✓ 28/10; **bảng tham số thu 4 nguồn ✓ 29/10** (`docs/dataset-capture-parameters.md`); còn: log sheet footage tự quay (khi đi quay); Roboflow backup (token, không block) |
 | **W4 ✓** | 09/11–15/11 | **✓ DONE SỚM 30/10–04/11 (W4d1–d5):** fine-tune 8c: 26n-100ep mAP50 0.5557 (plateau, data-limited) → escalate **26s-rebal 100ep = 0.6314** (soldier **0.895**, mil_vehicle **0.957**); K2 combat clip thật: soldier 2,236 det + 3 tank box conf 0.73–0.81; SLM 8c (DANGEROUS_TARGETS −person) + `--model`; K2 domain finetune 11/10 (`k2-cp`). **Gate mAP50 ≥0.75 KHÔNG đạt (0.631) — chấp nhận có lý do** (data-limited, mission class đạt — report W4) | mission class đạt (soldier/mil_vehicle); **laptop FPS verify ✓ 18/11: 13–17fps @720p K2 (peak 21) trên 4GB** — AC8 (≥15@360P) dự kiến vượt, re-measure 360P ở W6; TensorRT engine = booster tùy chọn phía laptop · report `weekly-261104-w4-report.md` |
-| **W5** | 16/11–22/11 | **Re-scope 18/11 (user chốt — bỏ WireGuard, không có SIM 4G)**: hotspot WPA2 riêng + UDP 8888 + `udp_position_sender.py` + **link-loss drill** (≤5s local, không crash) + **test pipe scrcp qua WiFi** (`adb connect` qua hotspot — phi công đứng xa; clip K2 trên phone, không cần UAV) — **mạng riêng = critical path** (quyết định 19/11: scrcp WiFi-only, loại USB/BT) | `test_link_loss.py` PASS (AC5); scrcp WiFi fps ổn định + UDP 8888 đồng thời không degrade |
+| **W5** | 16/11–22/11 | **Re-scope 18/11 (user chốt — bỏ WireGuard, không có SIM 4G)**: hotspot WPA2 riêng + UDP 8888 + `udp_position_sender.py` + **link-loss drill** (≤5s local, không crash) + **test pipe AirPlay qua WiFi** (iPhone là iOS — scrcp Android-only, sửa 19/11 — phi công đứng xa; clip K2 trên iPhone, không cần UAV) — **mạng riêng = critical path** (quyết định 19/11: WiFi-only, loại USB/BT/scrcp) | `test_link_loss.py` PASS (AC5); AirPlay WiFi fps ổn định + UDP 8888 đồng thời không degrade |
 | **W6** | 23/11–29/11 | Video source abstraction (`--source webcam/rtsp/uvc/file`); hiệu chỉnh YOLO cho 360P → **M3 done** | ≥15fps @360P; người trong khung → cảnh báo <2s (nửa AC8) |
 | **W7** | 30/11–06/12 | **Badge target trong/ngoài tầm nhìn** (cone visual trên minimap đã BỎ theo user 11/16 — minimap hiện = radar heading-up + mũi tên N + `--heading`; FOV indicator giữ dạng text badge) + tuần tra + **chế độ follow target** (MAVLink qua DJI Virtual Port nếu verify OK, nếu không = route gợi ý tay + HUD chỉ hướng) + **tam giác phân GPS** (`tactical_geolocation.py`: pose UAV + pixel → lat/lon target; `alt` vào payload UDP; đo FOV → B1) | `--sim` lộ trình waypoint: **UAV bay theo vị trí mục tiêu**, **khoảng cách target→lính sai <15%** so ground truth (AC6 sim) |
 | **W8** | 07/12–13/12 | Tích hợp full: telemetry qua mạng riêng, 4 chế độ degradation (full/position-only/local/**mất video → frame cuối + banner MẤT LIÊN KẾT**), link-loss test → **M4 done** | AC6 (bay thật nếu được, nếu không sim+bench); AC8: 10 phút live ổn định; cắt link → local ≤5s không crash |
@@ -60,7 +60,7 @@ Plan `261116-1156-tensorrt-minimap-radar` (completed).
   │  (demo: GPS + gimbal)      │          │  YOLO 8c + ByteTrack → TrackStore          │
   │  camera ───────────────────┼─────────►│    → gater (key = track_id) → câu cảnh báo │
   │   WiFi → app phone (DJI Fly)          │      (template 0ms; SLM qwen2.5 optional)  │
-  │   → scrcp USB → laptop    │          │    → HUD OpenCV: box + minimap + cone FOV  │
+  │   → AirPlay → laptop      │          │    → HUD OpenCV: box + minimap + cone FOV  │
   │                            │ position │  TelemetryFeed UDP :8888 (interface giữ    │
   │  GPS + alt + góc gimbal    │          │  nguyên, TTL 5s = STALE_AFTER_S)           │
   │  (Mini 2 SE) ──────────────┼─────────►│                                             │
@@ -80,9 +80,9 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 
 | # | Điểm mù | Impact | Khi nào hết mù | Cách giải quyết |
 |---|---------|--------|----------------|-----------------|
-| B1 | **alt + FOV thực của Mini 2 SE** (input tam giác phân GPS) — *downlink đã rõ 23/10: cả i1 Pro lẫn Mini 2 SE đều WiFi → app phone → scrcp USB → laptop* | Variant video W6 = phone-scrcp (chốt 23/10); geolocation W7 (nominal h=30m, FOV 60° tới đó) | **Khi Mini 2 SE về tay + 1 tuần** | **Đo FOV (bay 30m, đánh dấu 2 điểm cách 10m, đếm pixel) + verify alt + đọc góc gimbal app**; ghi kết quả vào đây; tới trước W9 (field test) |
+| B1 | **alt + FOV thực của Mini 2 SE** (input tam giác phân GPS) — *downlink đã rõ 23/10: cả i1 Pro lẫn Mini 2 SE đều WiFi → app phone → mirror → laptop (sửa 19/11: iPhone là iOS → **AirPlay**)* | Variant video W6 = mirror window (**AirPlay**; chốt 23/10, sửa 19/11); geolocation W7 (nominal h=30m, FOV 60° tới đó) | **Khi Mini 2 SE về tay + 1 tuần** | **Đo FOV (bay 30m, đánh dấu 2 điểm cách 10m, đếm pixel) + verify alt + đọc góc gimbal app**; ghi kết quả vào đây; tới trước W9 (field test) |
 | B2 | **MAVLink/GCS** — Mini 2 SE: **DJI Virtual Port** (MAVLink tập hợp giới hạn: telemetry + GOTO/waypoint) — verify thực | W7: upload waypoint tự động (variant A) vs bay tay theo route gợi ý (variant B — build trước) | **Khi Mini 2 SE về tay + 1 tuần** | DJI Assistant/virtual port + QGroundControl; i1 Pro: không MAVLink (chỉ chim tập) |
-| B3 | **Vị trí UAV** — Mini 2 SE: **có GPS + áp kế** ✓ (spec 23/10); i1 Pro: không GPS (chỉ chim tập) | W7 tam giác phân GPS khả thi với Mini 2 SE | **Đóng khi Mini 2 SE về tay** (verify GPS lock + alt) | i1 Pro không block gì (chỉ tập bay + test scrcp bridge) |
+| B3 | **Vị trí UAV** — Mini 2 SE: **có GPS + áp kế** ✓ (spec 23/10); i1 Pro: không GPS (chỉ chim tập) | W7 tam giác phân GPS khả thi với Mini 2 SE | **Đóng khi Mini 2 SE về tay** (verify GPS lock + alt) | i1 Pro không block gì (chỉ tập bay + test AirPlay bridge) |
 | B4 | Node ESP32+NEO-6M trong BOM **chưa mua** (`hardware-bom.md` ghi "chưa mua") | Không có node GPS vật lý → demo dùng `--soldier-gps` + đồng đội mô phỏng | W1 | Đếm kho; nếu không có → dùng đường sim (code đã hỗ trợ) |
 | B5 | **MVRSD qua Baidu pan** — server có truy cập không? | — | **✓ ĐÓNG 27/10** | MVRSD đã tải qua **mirror InvictusRex (GitHub LFS)** — không cần Baidu; 13,582 ảnh verify YOLO format |
 | B6 | **Chất lượng 360P** (người 20m ≈ 40–60px) | Detection rớt → phải tune imgsz/NMS ở W6 | W1 (video tổng hợp); retest frame thật khi UAV về | **W1d5 ✓ (19/10):** `test_360p_precision.py` — 30 frame 640×360 (bus.jpg pan): **P 0.74 / R 0.79** (conf ≥0.25, person ~170px) — người to; khi bay thật (i1 Pro / Mini 2 SE) retest frame thật (người 16–40px) mới là dữ liệu quyết định |
@@ -111,7 +111,7 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 |-------|------|--------|
 | 1 | [Tracking and gater track_id](./phase-01-tracking-and-gater-track-id.md) | **Done** (W1 ✓ 19/10, W2 ✓ 26/10 — AC1–AC4 + anchor; còn item UAV về tay trước W9 = B1–B3) |
 | 2 | [YOLO 8-class fine-tune MVRSD](./phase-02-yolo-8-class-fine-tune-mvrsd.md) | **Done** (W4 ✓ sớm 30/10–04/11 — 26s-rebal mAP50 0.6314, mission class soldier 0.895 / mil_vehicle 0.957; gate 0.75 miss đã chấp nhận có lý do) |
-| 3 | [Mạng riêng + link loss + video scrcp + camera 360P](./phase-03-private-network-vpn-and-360p-camera.md) | Pending |
+| 3 | [Mạng riêng + link loss + video AirPlay + camera 360P](./phase-03-private-network-vpn-and-360p-camera.md) | Pending |
 | 4 | [FOV patrol and integration](./phase-04-fov-patrol-and-integration.md) | Pending |
 | 5 | [Field test demo and docs](./phase-05-field-test-demo-and-docs.md) | Pending |
 
@@ -126,7 +126,7 @@ dữ liệu cũ >5s tự vô hiệu — cơ chế `STALE_AFTER_S` đã có ở `
 
 ## Open questions
 
-1. **Downlink video** — ĐÃ RÕ (23/10): i1 Pro + Mini 2 SE đều **WiFi → app phone** (DJI Fly) → bridge **scrcp USB → laptop** (variant video W6 chốt). UAV "được cấp" (nếu về) vẫn là lựa chọn thay thế.
+1. **Downlink video** — ĐÃ RÕ (23/10): i1 Pro + Mini 2 SE đều **WiFi → app phone** (DJI Fly) → bridge **mirror → laptop** (variant video W6 chốt; **sửa 19/11: iPhone là iOS → AirPlay, không scrcp** — scrcp/adb chỉ chạy Android). UAV "được cấp" (nếu về) vẫn là lựa chọn thay thế.
 2. **DJI Virtual Port** (Mini 2 SE) có GOTO/waypoint ổn định không (tuần tra tự động)? → verify khi nhận máy → variant A/B tuần tra W7.
 3. Có sẵn **SIM 4G/data** nào không? → nếu không: chỉ WiFi riêng (demo trong vùng phủ AP).
 4. Module rung (haptic) có được cấp thêm sau này không? → giữ blocked; AC4 fallback flash + SLM.
@@ -295,10 +295,10 @@ plan.md (architecture).
 
 **Bối cảnh:** UAV "được cấp" chưa rõ ngày về; user mua **i1 Pro** (Shopee, mini drone
 360–480P, WiFi → app phone 50–100m, 2.4GHz, pin 10–15 phút, không GPS, không MAVLink).
-**Decision (user chốt):** (1) **i1 Pro = chim tập** (rèn phi công + test scrcp bridge);
+**Decision (user chốt):** (1) **i1 Pro = chim tập** (rèn phi công + test AirPlay bridge);
 (2) **chờ DJI Mini 2 SE làm UAV demo chính** (249g, GPS + áp kế + gimbal 1080P, bay 31 phút,
 user mua riêng ~7–9tr) — **W7 tam giác phân GPS giữ nguyên** (user không muốn bỏ W7);
-(3) downlink cả 2 drone = **WiFi → app phone → scrcp USB → laptop** → **variant video W6 chốt**
+(3) downlink cả 2 drone = **WiFi → app phone → mirror → laptop** → **variant video W6 chốt** (sửa 19/11: iPhone là iOS → **AirPlay**, không scrcp)
 (loại RTSP/FPV 5.8G); (4) S4: Mini 2 SE có **DJI Virtual Port** (MAVLink giới hạn:
 GOTO/waypoint) → patrol/follow mode đầy đủ, verify khi nhận máy; i1 Pro không MAVLink.
 **Impact:** plan.md (overview, sơ đồ, W7/W9, B1–B3, B6, dependencies, open Q1/Q2/Q6) ·

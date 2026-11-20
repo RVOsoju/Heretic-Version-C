@@ -11,7 +11,8 @@
 > **UAV demo (cập nhật 2026-10-23):** **i1 Pro** (mini drone 360–480P, WiFi → app phone,
 > không GPS/MAVLink — chim tập, đã có tay) + **DJI Mini 2 SE** (249g, **GPS + áp kế + gimbal
 > 1080P**, bay 31 phút — demo chính, user mua riêng; downlink = DJI Fly (app phone) →
-> **scrcp USB → laptop**; MAVLink giới hạn qua **DJI Virtual Port**). UAV "được cấp" (nếu về)
+> **AirPlay qua WiFi (iPhone; sửa 19/11 — scrcp Android-only)**; MAVLink giới hạn qua
+> **DJI Virtual Port**). UAV "được cấp" (nếu về)
 > = lựa chọn thay thế.
 
 ---
@@ -24,8 +25,9 @@ từ video trinh sát (UAV 360P+/webcam), hệ thống phát hiện + theo dõi 
 **im lặng** (haptic rung khi có phần cứng — OPSEC: không lộ vị trí),
 và **câu chữ** (template 0ms; SLM optional — màn C2) — chạy thời gian thực trên laptop cá nhân,
 liên kết UAV qua **mạng riêng WiFi** (không phụ thuộc hạ tầng dân dụng): video
-đi **scrcp TCP** (phone DJI Fly → `adb connect` qua hotspot) + telemetry UDP 8888
-cùng 1 mạng — **mạng riêng là critical path** (quyết định 19/11: scrcp WiFi-only).
+đi **AirPlay** (iPhone DJI Fly → AirPlayReceiver trên laptop, qua hotspot) + telemetry
+UDP 8888 cùng 1 mạng — **mạng riêng là critical path** (quyết định 19/11: WiFi-only;
+iPhone là iOS → AirPlay, không scrcp).
 
 ## 2. Definition of done
 
@@ -44,10 +46,10 @@ chưa chạy được đủ AC1–AC11 (AC4 = chế độ fallback hình ảnh c
 |---|-----|----------|----|
 | S1 | **Tracking (ByteTrack)** | Real-time; track_id ổn định; tính **vận tốc + tốc độ tiếp cận**; gater chuyển key từ `(target, bearing)` sang `track_id`; **nhiều target → cảnh báo target gần nhất** (câu cảnh báo + HUD có khoảng cách m + hướng từ lính); **khoảng cách target→lính**: W2 **object-height anchor** (scale = kích thước thật class / chiều cao box, ±15–25%, không cần alt UAV) → W7 **tam giác phân GPS** (GPS UAV + alt + góc chúi + FOV + pixel → lat/lon target → 2D tới lính, ±10–15%) — model pixel-scale cố định 0.05 chỉ đúng ở độ cao ~15–22m (sai ×1.5–3 ở 30–50m) | AC1–AC3 |
 | S2 | **Kênh cảnh báo im lặng** | **Hiện tại: HUD flash + SLM (chưa có module rung).** Haptic (Arduino + motor) giữ làm mục blocked — bật lại khi có phần cứng, AC4 fallback = flash hình <100ms | AC4 |
-| S3 | **Mạng riêng WiFi + link loss** | **Thay LoRa** (quyết định 2026-10-15). **Re-scope 18/11: bỏ WireGuard** (không có SIM 4G, demo trong vùng phủ AP) — hotspot WPA2 riêng + UDP 8888; **interface `TelemetryFeed` không đổi**; link đứt → chế độ cục bộ TTL 5s (đã có `STALE_AFTER_S`); **video pipe scrcp qua WiFi**: drone → phone (DJI Fly) → scrcp TCP qua hotspot → laptop (Mini 2 SE không có link trực tiếp laptop); OcuSync ép 5.8GHz để tách khỏi hotspot 2.4GHz | AC5 |
+| S3 | **Mạng riêng WiFi + link loss** | **Thay LoRa** (quyết định 2026-10-15). **Re-scope 18/11: bỏ WireGuard** (không có SIM 4G, demo trong vùng phủ AP) — hotspot WPA2 riêng + UDP 8888; **interface `TelemetryFeed` không đổi**; link đứt → chế độ cục bộ TTL 5s (đã có `STALE_AFTER_S`); **video pipe AirPlay qua WiFi**: drone → iPhone (DJI Fly) → AirPlay qua hotspot → AirPlayReceiver trên laptop (Mini 2 SE không có link trực tiếp laptop; iPhone là iOS → không scrcp); OcuSync ép 5.8GHz để tách khỏi hotspot 2.4GHz | AC5 |
 | S4 | **UAV tuần tra + FOV + theo dõi** | Flycam bay theo lộ trình quanh vị trí người được bảo vệ (MAVLink qua DJI Virtual Port của Mini 2 SE nếu verify OK, nếu không = bay tay theo route gợi ý); laptop vẽ **vùng phủ camera** (cone) lên minimap; **chế độ follow: UAV bay theo vị trí mục tiêu** (sim: theo track; real: MAVLink GOTO / HUD chỉ hướng cho phi công); **indicator target trong/ngoài tầm nhìn UAV**; mode sim khi chưa bay thật | AC6 |
 | S5 | **YOLO 8 class (góc UAV)** | 8 class (chốt 2026-10-15): `person, soldier, car, motorcycle, truck, bus, boat, military_vehicle` — **gộp tất cả xe quân sự thành 1 class** (không phân tank/IFV/pháo), **loại máy bay**, **phân biệt người thường/lính**. Dataset **đặc thù UAV** (yêu cầu giảng viên 2026-10-16): MVRSD (góc drone/satellite, gộp label) + **VisDrone** (ảnh drone: person + 4 xe) + footage UAV thật tự quay (khi UAV về — gold standard, đồng thời là nguồn `soldier` B9); **tham số thu (độ cao, tốc độ, FOV) ghi vào báo cáo**; server multi-GPU; **pin version ultralytics server=laptop** | AC7 |
-| S6 | **Demo UAV (i1 Pro / Mini 2 SE, 360P+)** | Video source abstraction (webcam / RTSP / UVC / file / **scrcp phone**); hiệu chỉnh YOLO cho input 360P; chạy demo end-to-end bằng UAV thật | AC8 |
+| S6 | **Demo UAV (i1 Pro / Mini 2 SE, 360P+)** | Video source abstraction (webcam / RTSP / UVC / file / **mirror window — AirPlay iPhone**); hiệu chỉnh YOLO cho input 360P; chạy demo end-to-end bằng UAV thật | AC8 |
 | S7 | **Kênh câu chữ (template + SLM optional)** | template f-string = **chính** (0ms, 0 VRAM, luôn hoạt động); SLM qwen2.5:3b Ollama = optional qua `--slm` (cảnh báo tiếng Việt ≤12 từ, advisory chỉ cho C2) — **không** vào vòng lặp thời gian thực | AC10 |
 
 **Dataset 8 class — trả lời "bao nhiêu đối tượng, cụ thể gì" (yêu cầu giảng viên 2026-10-16):**
@@ -124,7 +126,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 **Mốc (plan chi tiết từng tuần: `plans/261015-1637-phase5-3-month-roadmap/`):**
 - M1 (tuần 1–2) tracking + gater track_id → AC1–AC3
 - M2 (tuần 3–4) fine-tune MVRSD + VisDrone (góc UAV) trên server → AC7
-- M3 (tuần 5–6) mạng riêng (hotspot + UDP) + link loss + video scrcp + camera 360P → AC5, AC8 (nửa)
+- M3 (tuần 5–6) mạng riêng (hotspot + UDP) + link loss + video AirPlay + camera 360P → AC5, AC8 (nửa)
 - M4 (tuần 7–8) FOV/patrol + tích hợp full + degradation modes → AC6, AC8
 - M5 (tuần 9–12) field test + demo E2E + tài liệu đồ án + buffer → AC9–AC11
 
@@ -132,11 +134,11 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 
 | Rủi ro | Mitigation |
 |--------|------------|
-| **FOV/alt thực + DJI Virtual Port của Mini 2 SE chưa verify** (input tam giác phân GPS + tuần tra) — *downlink đã rõ 23/10: WiFi → app phone → scrcp* | i1 Pro bay thử ngay (chim tập + test scrcp); Mini 2 SE: verify khi về tay (trước W9); W1–W6 build sim-first |
+| **FOV/alt thực + DJI Virtual Port của Mini 2 SE chưa verify** (input tam giác phân GPS + tuần tra) — *downlink đã rõ 23/10: WiFi → app phone → mirror (sửa 19/11: **AirPlay** — iPhone là iOS)* | i1 Pro bay thử ngay (chim tập + test AirPlay); Mini 2 SE: verify khi về tay (trước W9); W1–W6 build sim-first |
 | Chất lượng detection trên 360P (người 20m chỉ ~40–60 px) | Chạy model hiện tại trên frame 360P mẫu ở tuần 1; hiệu chỉnh input size/NMS ở M3 |
 | MVRSD tải qua Baidu — server có thể không truy cập | Verify tuần 3; fallback: AMAD/InvictusRex (GitHub release) |
 | Fine-tune 8 class degrade 6 class COCO cũ | Fine-tune trộn MVRSD + COCO; AC7 yêu cầu mAP COCO không giảm >5% |
-| scrcp-over-WiFi là **critical path** (video + telemetry cùng mạng); hotspot Windows chỉ 2.4GHz + hay drop client khi mang tải | W5d5 bench chất lượng mạng (fps ổn định, packet loss, tải đồng thời); ép OcuSync 5.8GHz tách băng tần; fallback: router có sẵn làm AP 5GHz / USB scrcp cùng chỗ / replay video 360P qua file (PDR §7) |
+| AirPlay-over-WiFi là **critical path** (video + telemetry cùng mạng); hotspot Windows chỉ 2.4GHz + hay drop client khi mang tải | W5d5 bench chất lượng mạng (fps ổn định, packet loss, tải đồng thời); ép OcuSync 5.8GHz tách băng tần; fallback: router có sẵn làm AP 5GHz / replay video 360P qua file (PDR §7) |
 | UAV không hỗ trợ MAVLink/GCS | S4 fallback: bay tay theo route gợi ý trên map + FOV + HUD chỉ hướng cho follow — vẫn đạt AC6 (sim + bay thật) |
 | VisDrone license / tham số thu chưa verify | Verify license + độ cao thu ở W3; fallback: MVRSD + COCO + footage tự quay (ghi trade-off trong báo cáo) |
 | **alt/FOV của UAV được cấp chưa biết** (input tam giác phân GPS) | B1: đo khi UAV về (bay 30m, marker 10m, đếm pixel) + verify alt; sim nominal h=30m, FOV 60° tới đó; re-verify trước W9 |
@@ -144,7 +146,7 @@ xuống/tilt trước, target cách 10–50m ≈ 20–60 px.
 
 ## 10. Câu hỏi mở (chưa giải quyết)
 
-1. **Downlink video** — ĐÃ RÕ (23/10): i1 Pro + Mini 2 SE đều **WiFi → app phone** → bridge **scrcp USB → laptop** (chốt M3).
+1. **Downlink video** — ĐÃ RÕ (23/10): i1 Pro + Mini 2 SE đều **WiFi → app phone** → bridge **AirPlay → laptop (iPhone, sửa 19/11 — scrcp Android-only)** (chốt M3).
 2. **DJI Virtual Port** (Mini 2 SE) có GOTO/waypoint ổn định không (tuần tra tự động)? → verify khi nhận máy; fallback bay tay theo route gợi ý.
 3. Có sẵn **SIM 4G/data** nào không (nếu không → chỉ dùng WiFi riêng)?
 4. Module rung (haptic) có được cấp thêm sau này không?
