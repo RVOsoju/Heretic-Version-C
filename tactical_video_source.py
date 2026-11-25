@@ -9,7 +9,7 @@ Kinds:
   rtsp   : RTSP URL (FFMPEG, buffer 1 — lay khung moi nhat, giam delay)
   uvc    : duong dan thiet bi UVC
   file   : duong dan file video
-  window : capture window tren man hinh theo title (AirPlayReceiver/scrcp)
+  window : capture window tren man hinh theo title (UxPlay/scrcp)
            — Windows only (mss + pywin32)
 """
 import time
@@ -52,7 +52,7 @@ class Cv2Source:
 class WindowSource:
     """Capture window theo title (mss + pywin32) — Windows only.
 
-    De mirror screen (AirPlayReceiver/scrcp): title window chua substring `url`.
+    De mirror screen (UxPlay/scrcp): title window chua substring `url`.
     Re-query rect moi khung vi window co the di chuyen/resize.
     """
 
@@ -95,6 +95,25 @@ class WindowSource:
 
     def release(self):
         self._sct.close()
+
+
+def list_visible_window_titles():
+    """Danh sach title cua cac window hien thi (Windows) — de tim title window mirror.
+
+    Chi Windows (pywin32). Dung khi khong biet chinh xac title cua window
+    UxPlay/scrcp de truyen vao WindowSource.
+    """
+    import win32gui
+    titles = []
+
+    def _cb(hwnd, _):
+        if win32gui.IsWindowVisible(hwnd):
+            text = win32gui.GetWindowText(hwnd)
+            if text:
+                titles.append(text)
+
+    win32gui.EnumWindows(_cb, None)
+    return titles
 
 
 def open_video_source(kind, url, width=None, height=None):

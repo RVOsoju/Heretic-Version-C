@@ -174,10 +174,10 @@ def main():
     parser.add_argument("--source", choices=["webcam", "rtsp", "uvc", "file", "window"],
                         default="webcam",
                         help="Loai nguon video (mac dinh webcam; window = capture window mirror "
-                             "AirPlayReceiver/scrcp theo title — Windows only)")
+                             "UxPlay/scrcp theo title — Windows only)")
     parser.add_argument("--source-url", default="0",
                         help="URL cua nguon video: index webcam / RTSP / duong dan / title window "
-                             "(mac dinh '0'; vi du: --source window --source-url AirPlay)")
+                             "(mac dinh '0'; vi du: --source window --source-url UxPlay)")
     parser.add_argument("--heading", type=float, metavar="DEG",
                         help="Heading cua lich, do la ban (0=Bac, 90=Dong, dong chieu kim dong ho) — "
                              "minimap xoay theo huong + ve mũi tên N (mac dinh: North-up)")

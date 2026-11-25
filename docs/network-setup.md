@@ -5,12 +5,14 @@ nhận vị trí đồng đội (node 2) qua **UDP 8888** — tất cả trên 1
 Đây là critical path của demo — làm theo thứ tự các Part dưới, mỗi Part có
 **điểm kiểm tra** (✓) trước khi sang Part kế.
 
-**Thời lượng:** ~1–1.5h (gồm 30 phút bench).
+**Thời lượng:** ~1.5–3h (gồm 30–90p build UxPlay + 30–60p bench).
 **Sửa 19/11:** phone là iOS → AirPlay (không scrcp/adb); node 2 = iSH trên iPhone.
+**Sửa 23/11:** app nhận AirPlay = **UxPlay** (build từ source qua MSYS2 — repo
+AirPlayReceiver cũ đã gỡ; UxPlay KHÔNG có bản `.exe` tải sẵn, phải compile).
 
 ```
 Drone (Mini 2 SE) ──OcuSync 5.8GHz──► iPhone (DJI Fly)      [sau này, W9]
-iPhone ──AirPlay (WiFi)──► laptop: window AirPlayReceiver → capture (mss) → HUD
+iPhone ──AirPlay (WiFi)──► laptop: window UxPlay → capture (mss) → HUD
 iPhone (iSH) ──UDP 8888──► laptop: TelemetryFeed (chấm xanh trên minimap)
 ```
 
@@ -19,7 +21,7 @@ Tách băng tần (khi bay drone): **OcuSync ép 5.8GHz** trong DJI Fly
 
 ---
 
-## PART 0 — Chuẩn bị laptop (15 phút)
+## PART 0 — Chuẩn bị laptop (30–90 phút — build UxPlay)
 
 ### 0.1 Cập nhật code
 
@@ -34,15 +36,64 @@ git pull
 `udp_receive_counter.py`, `tactical_video_source.py`, `bench_window_capture.py`
 có trong thư mục.
 
-### 0.2 Cài AirPlayReceiver (app nhận AirPlay trên Windows)
+### 0.2 Build UxPlay (app nhận AirPlay trên Windows)
 
-1. Mở: `https://github.com/stefand/airplayreceiver/releases`
-2. Tải file `.zip` mới nhất (hàng `AirPlayReceiver v...`, file `win-x64`).
-3. Giải nén ra 1 chỗ cố định, vd `C:\AirPlayReceiver\`.
-4. Chạy `AirPlayReceiver.exe` → xuất hiện 1 **window đen** trên desktop.
-5. **Để window mở — không đóng.**
+UxPlay (`github.com/FDH2/UxPlay`) là server AirPlay 2 viết bằng C++. Trên Windows
+phải **compile từ source** qua MSYS2 (MinGW-64) — releases GitHub chỉ có source
+archive, **không có `.exe` build sẵn**. Làm 1 lần, ~30–90 phút.
 
-**✓ Kiểm tra:** window AirPlayReceiver đang mở, không có báo lỗi.
+**0.2.1 Cài MSYS2**
+
+1. Tải + cài từ `https://www.msys2.org/` → nhận mặc định `C:\msys64`.
+2. Start menu → mở **MSYS2 UCRT64** (terminal UCRT64).
+
+**0.2.2 Cài dependencies (trong terminal UCRT64)**
+
+```
+pacman -Syu
+```
+(Nếu `pacman -Syu` yêu cầu **đóng mở lại terminal** → đóng tab UCRT64, mở lại,
+rồi chạy tiếp 2 lệnh dưới.)
+
+```
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake \
+  mingw-w64-ucrt-x86_64-openssl mingw-w64-ucrt-x86_64-libplist \
+  mingw-w64-ucrt-x86_64-gstreamer mingw-w64-ucrt-x86_64-gst-plugins-base \
+  mingw-w64-ucrt-x86_64-pkg-config base-devel
+pacman -S --needed mingw-w64-ucrt-x86_64-gst-libav \
+  mingw-w64-ucrt-x86_64-gst-plugins-good mingw-w64-ucrt-x86_64-gst-plugins-bad
+```
+(Dòng 1 = deps để **compile**; dòng 2 = GStreamer plugins để **chạy** uxplay —
+`libav` là bộ giải H.264, bắt buộc cho video AirPlay.)
+
+**0.2.3 Clone + build**
+
+```
+pacman -S --needed git
+git clone https://github.com/FDH2/UxPlay.git
+cd UxPlay
+export PKG_CONFIG_PATH=/ucrt64/lib/pkgconfig
+cmake -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNO_X11_DEPS=ON
+cmake --build build --parallel
+```
+
+**✓ Kiểm tra:** file `build/uxplay.exe` có trong thư mục `UxPlay\build\`
+(không có dòng lỗi `error:`).
+
+**0.2.4 Firewall + chạy UxPlay**
+
+1. Trong **cùng terminal UCRT64** đó, chạy:
+   ```
+   build/uxplay
+   ```
+2. Windows hỏi firewall → bấm **Allow access** (Private networks). Nếu không hiện,
+   tự mở: `Settings` → `Privacy & security` → `Windows Security` →
+   `Firewall & network protection` → `Allow an app through firewall` →
+   thêm `uxplay.exe` (đánh dấu Private). **UxPlay không hiện trên iPhone → 90% là firewall.**
+3. **Để terminal UCRT64 này MỞ** — 1 **window UxPlay** sẽ hiện trên desktop.
+   **Đừng bấm Alt-Enter** (sẽ fullscreen, gây khó capture).
+
+**✓ Kiểm tra:** window UxPlay đang mở, terminal không báo lỗi.
 
 ### 0.3 Bật hotspot riêng
 
@@ -88,8 +139,8 @@ bằng IP thật của cậu.
 
 1. Trên iPhone: vuốt từ **góc trên-phải** xuống → mở **Control Center**.
 2. Bấm icon **Screen Mirroring** (2 hình chữ nhật chồng nhau) — KHÔNG cần giữ.
-3. Chọn **tên laptop** (dòng AirPlayReceiver) trong danh sách.
-4. Window AirPlayReceiver trên laptop **phải hiện màn hình iPhone**.
+3. Chọn **tên laptop** (dòng UxPlay) trong danh sách.
+4. Window UxPlay trên laptop **phải hiện màn hình iPhone**.
 5. Test: mở bất kỳ video nào trên iPhone → play full-screen →
    nhìn window trên laptop: **ổn định, không giật** (~30fps).
 
@@ -173,13 +224,16 @@ chạy **đồng thời**.
 **Đóng HUD trước** (nếu đang mở) — bench chạy độc lập.
 
 ```powershell
-.venv\Scripts\python bench_window_capture.py --title AirPlay --duration 30
+.venv\Scripts\python bench_window_capture.py --title UxPlay --duration 30
 ```
+(Nếu báo "khong tim thay window" → chạy
+`.venv\Scripts\python bench_window_capture.py --list` để xem title thật của
+window UxPlay, rồi thay `--title` bằng đúng substring đó.)
 
 **Kết quả mong đợi:**
 
 ```
-[BENCH] capture window chua 'AirPlay' trong 30s...
+[BENCH] capture window chua 'UxPlay' trong 30s...
   t=  3.1s fps= 29.3
   ...
 [BENCH] 870 khung / 30.0s = 29.0fps (ngưỡng ≥15), kich thuoc 1280x720
@@ -201,7 +255,7 @@ Vẫn giữ: clip đang play + AirPlay + iSH sender chạy. Chạy thêm:
 ### 4.4 Ước lượng latency video (bằng mắt, ~1 phút)
 
 Clip có đồng hồ: nhìn thời điểm kim giây chuyển trong clip vs thời điểm thấy
-trên window AirPlay → ước lượng trễ.
+trên window UxPlay → ước lượng trễ.
 
 **✓ Đạt:** **< 0.8s** (AirPlay chậm hơn scrcp, ngưỡng đã nới).
 
@@ -210,7 +264,7 @@ trên window AirPlay → ước lượng trễ.
 Để **tất cả** (clip + AirPlay + iSH sender) chạy liên tục 30 phút:
 
 ```powershell
-.venv\Scripts\python bench_window_capture.py --title AirPlay --duration 1800
+.venv\Scripts\python bench_window_capture.py --title UxPlay --duration 1800
 ```
 
 **✓ Đạt:** không có lúc window đen/drop client, fps không tụt về 0.
@@ -229,7 +283,7 @@ trên window AirPlay → ước lượng trễ.
 
 ### 5.2 Mất link video (AirPlay)
 
-1. Laptop: chạy `heretic_phase4_hud.py --source window --source-url AirPlay`
+1. Laptop: chạy `heretic_phase4_hud.py --source window --source-url UxPlay`
    (iPhone đang mirror clip).
 2. iPhone: **tắt Wi-Fi** (Control Center → icon WiFi).
 3. **Quan sát HUD:** phải **đơ tại frame cuối, không crash**
@@ -258,11 +312,11 @@ Gửi 5 con số (chụp màn hình console cũng được):
 
 | Triệu chứng | Nguyên nhân → xử lý |
 |-------------|---------------------|
-| Không thấy laptop trong danh sách AirPlay | iPhone + laptop khác mạng / AirPlayReceiver chưa chạy → iPhone join hotspot `heretic`, mở lại receiver |
-| Window AirPlay đen/đơ | iPhone khóa màn → Part 1.1 (Auto-Lock: Never) |
+| Không thấy laptop trong danh sách AirPlay | iPhone + laptop khác mạng / UxPlay chưa chạy / firewall chặn → iPhone join hotspot `heretic`, mở lại `build/uxplay`, cho phép `uxplay.exe` qua firewall (Part 0.2.4) |
+| Window UxPlay đen/đơ | iPhone khóa màn → Part 1.1 (Auto-Lock: Never) |
 | `apk add` trong iSH lỗi/không lên | Mạng iSH chưa sẵn → đóng mở iSH lại; vẫn lỗi → kiểm tra iPhone đã join hotspot |
 | `curl` trong iSH không tải được file | Part 2.1 chưa chạy / sai IP → kiểm tra `python -m http.server 8000` đang mở, thay IP đúng |
 | HUD không có chấm xanh | sender sai `--target` / firewall laptop chặn port 8888 → chạy lại Part 2.3 với IP đúng; tắt tạm Windows Firewall test |
-| `bench_window_capture.py` báo "khong tim thay window" | AirPlayReceiver chưa mở / title sai → mở receiver, thử `--title AirplayReceiver` |
+| `bench_window_capture.py` báo "khong tim thay window" | UxPlay chưa mở / title sai → mở `build/uxplay`, chạy `--list` để xem title thật rồi thay `--title` |
 | Hotspot drop client khi chạy 30 phút | Giới hạn hotspot Windows → dùng router cũ làm AP 5GHz (settings WPA2, cùng tên `heretic`) |
 | Video drone giật khi bay thật (W9) | OcuSync đang 2.4GHz tranh sóng → ép 5.8GHz trong DJI Fly |

@@ -22,7 +22,7 @@ W5: hotspot WPA2 riêng + UDP 8888 (`udp_position_sender.py` + `test_link_loss.p
 + **link-loss drill** (≤5s local, không crash) + **test pipe AirPlay qua WiFi**
 (qua hotspot — phi công đứng xa, không cable; clip K2 trên iPhone,
 không cần UAV). W6: video source abstraction
-(`--source webcam/rtsp/uvc/file/window` — window = capture AirPlayReceiver
+(`--source webcam/rtsp/uvc/file/window` — window = capture UxPlay
 theo title) + hiệu chỉnh YOLO cho 360P (nửa AC8).
 **Quyết định 19/11: WiFi-only** (loại USB/Bluetooth/scrcp — iOS) → mạng riêng giờ là
 **critical path** (mang video + telemetry) → bench W5 = bench chất lượng mạng
@@ -48,10 +48,10 @@ AirPlay + drill → số liệu → AC5; W6d3 tune 360P + đo ≥15fps + cảnh 
 - Link đứt → `TelemetryFeed` tự chuyển local sau ≤5s (`STALE_AFTER_S`,
   `tactical_telemetry_feed.py:23`), không crash.
 - **Video pipe AirPlay qua WiFi**: iPhone (DJI Fly / video) → **AirPlay**
-  (screen mirroring → window AirPlayReceiver trên laptop, qua hotspot) →
+  (screen mirroring → window UxPlay trên laptop, qua hotspot) →
   Python capture frame được ở fps dùng được (test bằng clip K2 trên iPhone —
   không cần drone). Không dùng USB (iOS không có USB debugging/adb).
-- `--source {webcam|rtsp|uvc|file|window}` (window = AirPlayReceiver/scrcp,
+- `--source {webcam|rtsp|uvc|file|window}` (window = UxPlay/scrcp,
   tìm theo title) + `--source-url` cho mọi nguồn video (W6).
 - 360P: ≥15fps trên RTX 3050; người trong khung → cảnh báo <2s.
 
@@ -64,7 +64,7 @@ AirPlay + drill → số liệu → AC5; W6d3 tune 360P + đo ≥15fps + cảnh 
 ```
 Drone (Mini 2 SE) ──OcuSync 5.8GHz──► iPhone (DJI Fly)
 iPhone ──AirPlay (qua hotspot WPA2)──► laptop:
-                                            window AirPlayReceiver → capture (mss) ──► cv2 frame ──► HUD
+                                            window UxPlay → capture (mss) ──► cv2 frame ──► HUD
 Node telemetry (iSH trên iPhone) ──UDP 8888 (cùng hotspot)──► laptop
 GPS drone: không trích được (không SDK) → udp_position_sender mô phỏng (chấm UAV)
 ```
@@ -83,7 +83,7 @@ Windows chỉ phát 2.4GHz → không tranh sóng.
   cắt link → stale ≤5s, không crash.
 - `tactical_video_source.py` — `open_video_source(kind, url) → cv2.VideoCapture`
   (webcam index / RTSP FFMPEG buffer nhỏ / UVC path / file / **window**
-  — capture window AirPlayReceiver/scrcp theo title, mss + pywin32);
+  — capture window UxPlay/scrcp theo title, mss + pywin32);
   trả fps thực đo.
 - `docs/network-setup.md` — hướng dựng mạng: AP WPA2 riêng, `udp_position_sender.py`,
   lệnh verify, quy trình link-loss drill.
@@ -105,7 +105,7 @@ Windows chỉ phát 2.4GHz → không tranh sóng.
 4. **W5d4** — **link-loss drill**: tắt WiFi node → assert `feed.fresh("uav")`
    = None sau ≤5s, HUD không crash.
 5. **W5d5** — **test AirPlay qua WiFi (bench chất lượng mạng)**: clip K2 trên iPhone
-   (không cần drone) → AirPlay → window AirPlayReceiver → laptop; capture frame bằng
+   (không cần drone) → AirPlay → window UxPlay → laptop; capture frame bằng
    Python (mss) → đo: fps video ổn định, packet loss, latency, **chạy đồng thời
    UDP 8888** (đúng điều kiện demo); nếu có i1 Pro → bay thật thay clip (mạnh hơn).
    Ghi kết quả → input thiết kế `--source window` cho W6.
@@ -122,7 +122,7 @@ Windows chỉ phát 2.4GHz → không tranh sóng.
 - [ ] Hotspot WPA2 riêng: laptop + node cùng AP; ping 2 chiều <20ms
 - [ ] `python test_link_loss.py` PASS: HUD nhận position 1Hz qua mạng riêng, sai <1m
       so sim; cắt link → local mode ≤5s, không crash — **AC5**
-- [ ] **Pipe AirPlay qua WiFi**: clip K2 trên iPhone → AirPlay → AirPlayReceiver →
+- [ ] **Pipe AirPlay qua WiFi**: clip K2 trên iPhone → AirPlay → UxPlay →
       laptop → Python capture frame fps dùng được, **đồng thời UDP 8888 không
       degrade** — **AC8** (đường đi)
 - [ ] `python heretic_phase4_hud.py --source window` (hoặc `file`/`webcam`) chạy
